@@ -1,0 +1,18 @@
+//
+// Created by hotdropper on 7/19/20.
+//
+
+#ifndef AMIIBUDDY_AMIIBO_TYPES_H
+#define AMIIBUDDY_AMIIBO_TYPES_H
+
+#define AMIIBO_TYPE_FIGURE 0x00
+#deinfe AMIIBO_TYPE_CARD   0x01
+#define AMIIBO_TYPE_YARN   0x02
+
+#define AMIIBO_GAME_SERIES_
+
+#define AMIIBO_SERIES_
+
+#define AMIIBO_CHARACTER_
+
+#endif //AMIIBUDDY_AMIIBO_TYPES_H

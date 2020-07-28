@@ -10,3 +10,7 @@ examples/Wifiibo/data/*.bin
 ehthumbs.db
 Thumbs.db
 doc/web_dump
+pio
+cmake-build-*
+CMakeLists*
+dist/
