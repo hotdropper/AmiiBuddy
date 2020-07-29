@@ -14,3 +14,6 @@ pio
 cmake-build-*
 CMakeLists*
 dist/
+.travis.yml
+.pio
+.idea
