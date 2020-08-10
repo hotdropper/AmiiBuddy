@@ -1,6 +1,7 @@
 
 #define PRINT_DEBUG 0
 #include <ArduinoDebug.h>
+#include <FSTools.h>
 #include "amiitool.h"
 
 amiitool atool;
@@ -21,6 +22,14 @@ bool keyValid(nfc3d_amiibo_keys * amiiboKeys)
 
     return true;
 }
+
+bool amiitool::loadKey(const char* keyFile) {
+    FSTools::readData(keyFile, amiiboKeyBytes, AMIIBO_KEY_FILE_SIZE);
+    debugKeyValidation(&amiiboKeys);
+
+    return (keyloaded = keyValid(&amiiboKeys));
+}
+
 
 bool amiitool::setAmiiboKeys(nfc3d_amiibo_keys loadedKeys) {
     amiiboKeys = loadedKeys;
@@ -85,6 +94,7 @@ amiitool::amiitool()
 {
 	keyloaded = false;
     fileloaded = false;
+    amiiboKeyBytes = reinterpret_cast<uint8_t*>(&amiiboKeys);
 }
 
 bool amiitool::isKeyLoaded()

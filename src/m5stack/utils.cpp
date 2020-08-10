@@ -141,7 +141,7 @@ void processRawAmiiboKeyData(const uint8_t *amiiboKeyRawData, nfc3d_amiibo_keys 
     }
 }
 
-void printAmiibo(amiiboInfoStruct info) {
+void printAmiibo(amiiboInfoStruct& info) {
     PRINTV("Name: ", info.amiiboName);
     PRINTV("Owner Mii Name: ", info.amiiboOwnerMiiName);
     PRINTV("Character Number: ",info.amiiboCharacterNumber);
@@ -198,3 +198,14 @@ void printHeapUsage() {
 //
 //    return progress;
 //}
+
+String fileToAmiiboName(const String& filePath) {
+    String name = filePath.substring(filePath.lastIndexOf("/") + 1);
+    name = name.substring(0, name.lastIndexOf("."));
+    int dashPos = name.indexOf("-");
+    if (dashPos > -1) {
+        name = name.substring(dashPos + 2);
+    }
+
+    return name;
+}

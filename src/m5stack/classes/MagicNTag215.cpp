@@ -4,7 +4,9 @@
 
 #define PRINT_DEBUG 1
 #include <ArduinoDebug.h>
+#include <AmiiboDBAO.h>
 #include "MagicNTag215.h"
+#include "AmiiboDatabaseManager.h"
 #include "m5stack/utils.h"
 #define ENFORCE_INLIST() { int ilr = inList(); if (ilr != 0) return ilr; }
 
@@ -36,6 +38,10 @@ int MagicNTag215::writeAmiibo() {
     reset(uidStr);
 
     for (uint8_t i = 3; i < 133; i++) {
+        if (i % 20 == 0) {
+            M5ez::yield();
+        }
+
         base = i * NTAG215_PAGESIZE;
         uint8_t cmd[] = { 0xA2, i, data[base], data[base + 1], data[base + 2], data[base + 3] };
 
@@ -49,20 +55,29 @@ int MagicNTag215::writeAmiibo() {
     PRINTLN("Writing data blocks");
     PRINTHEX(data, NTAG215_SIZE);
 
-    PRINTLN("Setting password...");
-    if (! setPassword("E9AF1C00")) {
+    PRINTLN("Setting pack...");
+    if (! setPack("80800000")) {
         return -4;
     }
 
-    PRINTLN("Setting pack...");
-    if (! setPack("80800000")) {
+    PRINTLN("Setting password...");
+    if (! setPassword("E9AF1C00")) {
         return -5;
     }
 
-    PRINTLN("Fixing checksum...");
-    if (! sendCommandString("A202E3480FE0")) {
-        return -6;
-    }
+    M5ez::yield();
+
+    atool.loadFileFromData(data, NTAG215_SIZE, false);
+    printAmiibo(atool.amiiboInfo);
+
+    char amiiboHash[33];
+    AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, amiiboHash);
+
+    char saveHash[AMIIBO_HASH_LEN];
+    AmiiboDBAO::calculateSaveHash(data, saveHash);
+
+    PRINTV("Amiibo Hash: ", amiiboHash);
+    PRINTV("Save Hash: ", saveHash);
 
     return 0;
 }

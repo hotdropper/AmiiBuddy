@@ -21,6 +21,8 @@ void setup() {
     runInit();
 }
 
+#ifndef UNIT_TEST
 void loop() {
     showMainMenu();
 }
+#endif

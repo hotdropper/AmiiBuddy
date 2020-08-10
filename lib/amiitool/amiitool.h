@@ -2,7 +2,6 @@
 #define AMIITOOL_H
 //#define USE_SDFAT
 
-#include <string.h>
 #include <Arduino.h>
 #include <amiibo.h>
 
@@ -56,6 +55,7 @@ class amiitool
 
         amiitool();
         bool setAmiiboKeys(nfc3d_amiibo_keys loadedKeys);
+        bool loadKey(const char* keyFile);
 		bool isKeyLoaded();
 		bool loadFileFromData(const uint8_t * filedata, int size, bool lenient);
 		void unloadFile();
@@ -72,6 +72,7 @@ class amiitool
 		static void readUTF16BEStr(uint8_t *startByte, int stringLen, char *outStr, bool byteSwap);
 		
 	private:
+        uint8_t* amiiboKeyBytes;
 		bool keyloaded;
 		bool fileloaded;
 		char *keyfilename;

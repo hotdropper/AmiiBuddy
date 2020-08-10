@@ -22,7 +22,10 @@ public:
     int search(const char* text, const search_callback_t& callback);
     int lookupAmiibo(const char* id, const search_callback_t& callback);
     int lookupSave(const char* amiibo_hash, const char* save_hash, const search_callback_t& callback);
+    int lookupSaves(const char* amiibo_hash, const bool onlyUserSaves, const search_callback_t& callback);
     int findByData(const uint8_t* data, const search_callback_t& callback);
+    int writeSave(const char* amiibo_hash, const char* save_hash, const char* save_name, const uint8_t* data);
+    int removeSave(const char* amiibo_hash, const char* save_hash);
 
 private:
     int getFileCount(const char* path);

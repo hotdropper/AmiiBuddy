@@ -6,6 +6,7 @@
 #include <ArduinoDebug.h>
 #include "NTag215.h"
 #include "m5stack/utils.h"
+#include "AmiiboDatabaseManager.h"
 
 NTag215::NTag215(PN532 *adapter) {
     _inListed = false;
@@ -171,7 +172,7 @@ int NTag215::readAmiibo() {
     PRINTV("Halt result: ", cmdResult);
 
     PRINTLN("Done.");
-    printHexDump(data, NTAG215_SIZE, 18);
+    PRINTHEXV("Read tag data: ", data, NTAG215_SIZE);
 
     return 0;
 }

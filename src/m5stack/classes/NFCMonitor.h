@@ -40,7 +40,7 @@ public:
 private:
     uint16_t loopProgress();
     uint16_t loopState();
-    char* loadSvg(const char* fileName);
+    void loadSvg(const char* fileName, char* dest);
     int _avgCount;
     int _count;
     bool _running;

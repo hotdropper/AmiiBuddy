@@ -9,7 +9,7 @@
 #include "NFCMonitor.h"
 #include <Preferences.h>
 #include "../init.h"
-#include "../fs_tools.h"
+#include <FSTools.h>
 #include "m5stack/utils.h"
 
 ezProgressBar* nfcProgressBar;
@@ -152,18 +152,16 @@ int NFCMonitor::monitorAmiiboWrite(ezProgressBar* pb, NTag215* tag) {
     return res;
 }
 
-char* NFCMonitor::loadSvg(const char* fileName) {
-    if (! AMIIBUDDY_FS_DEFAULT.exists(fileName)) {
-        return nullptr;
-    }
-
-    File f = AMIIBUDDY_FS_DEFAULT.open(fileName, FILE_READ);
-    size_t s = f.size();
-    char* dest = (char *)malloc(s + 1);
-    f.readBytes(dest, s);
-    f.close();
-    dest[s] = 0;
-    return dest;
+void NFCMonitor::loadSvg(const char* fileName, char* dest) {
+//    if (! AMIIBUDDY_FS_DEFAULT.exists(fileName)) {
+//        return;
+//    }
+//
+//    File f = AMIIBUDDY_FS_DEFAULT.open(fileName, FILE_READ);
+//    size_t s = f.size();
+//    f.readBytes(dest, s);
+//    f.close();
+//    dest[s] = 0;
 }
 
 void redraw(uint16_t x, uint16_t w) {

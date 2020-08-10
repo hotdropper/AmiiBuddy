@@ -7,7 +7,7 @@
 
 #include <event.hpp>
 #include <bus.hpp>
-#include "../fs_tools.h"
+#include <FSTools.h>
 
 struct EventNFCCommand: public eventpp::Event<EventNFCCommand> {
     explicit EventNFCCommand(uint8_t opCode): op{opCode} { }

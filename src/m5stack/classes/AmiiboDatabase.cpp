@@ -10,12 +10,12 @@
 #include <functional>
 #include <SD.h>
 #include <MD5Builder.h>
-#include <ArduinoJson.h>
 #include <amiitool.h>
 #include "NTag215.h"
 #include "AmiiBuddy.h"
 #include "m5stack/utils.h"
-#include "../fs_tools.h"
+#include <FSTools.h>
+#include <AmiiboDBAO.h>
 
 
 AmiiboDatabase amiiboDatabase;
@@ -27,34 +27,82 @@ int AmiiboDatabase::lookupSave(const char* amiibo_hash, const char* save_hash, c
 
     PRINTV("Looking up file: ", filePath);
 
-    if (! AMIIBUDDY_FS_DEFAULT.exists(filePath)) {
-        PRINT("Could not find file.");
-        return -1;
-    }
+    char fsBuff[FSTOOLS_MAX_PATH_LENGTH] = "";
 
-    File f = AMIIBUDDY_FS_DEFAULT.open(filePath, FILE_READ);
+    File f;
+    FSTools::openForRead(filePath.c_str(), &f);
 
     if (! f) {
         PRINT("Could not open file.");
         return -2;
     }
 
-    AmiiboDataDoc jsonDoc;
-    deserializeJson(jsonDoc, f);
+//    AmiiboDataDoc jsonDoc;
+//    deserializeJson(jsonDoc, f);
+//
+    f.close();
+//
+//    serializeJsonPretty(jsonDoc, Serial);
+//
+//    JsonObject obj = jsonDoc.as<JsonObject>();
+//
+//    if (callback != nullptr) {
+//        for (auto pair : obj) {
+//            if (strcmp(pair.key().c_str(), save_hash) != 0) {
+//                continue;
+//            }
+//            String k(pair.key().c_str());
+//            String v = pair.value().as<String>();
+//            callback(k, v);
+//            return 1;
+//        }
+//    }
+
+    return 0;
+}
+
+int lookupSaves(const char* filePath, const search_callback_t& callback) {
+    PRINTV("Looking up file: ", filePath);
+
+    File f;
+    FSTools::openForRead(filePath, &f);
+
+    if (! f) {
+        PRINT("Could not open file.");
+        return -2;
+    }
+
+//    AmiiboDataDoc jsonDoc;
+//    deserializeJson(jsonDoc, f);
 
     f.close();
 
-    serializeJsonPretty(jsonDoc, Serial);
-
-    JsonObject obj = jsonDoc.as<JsonObject>();
-
-    for (auto pair : obj) {
-        String k(pair.key().c_str());
-        String v = pair.value().as<String>();
-        callback(k, v);
-    }
+//    serializeJsonPretty(jsonDoc, Serial);
+//
+//    JsonObject obj = jsonDoc.as<JsonObject>();
+//
+//    if (callback != nullptr) {
+//        for (auto pair : obj) {
+//            String k(pair.key().c_str());
+//            String v = pair.value().as<String>();
+//            callback(k, v);
+//        }
+//    }
 
     return 0;
+}
+
+
+int AmiiboDatabase::lookupSaves(const char* amiibo_hash, const bool onlyUserSaves, const search_callback_t& callback) {
+    String filePath = String(AMIIBO_SAVE_FILE_PATH) + "/" + amiibo_hash + ".json";
+    String userFilePath = String(AMIIBO_SAVE_FILE_PATH) + "/" + amiibo_hash + ".user.json";
+
+    int ret = ::lookupSaves(userFilePath.c_str(), callback);
+    if (ret == -2) {
+        return ret;
+    }
+
+    return onlyUserSaves ? ret : ::lookupSaves(filePath.c_str(), callback);
 }
 
 int AmiiboDatabase::lookupAmiibo(const char* id, const search_callback_t& callback) {
@@ -62,119 +110,181 @@ int AmiiboDatabase::lookupAmiibo(const char* id, const search_callback_t& callba
 
     PRINTV("Looking up file: ", filePath);
 
-    if (! AMIIBUDDY_FS_DEFAULT.exists(filePath)) {
-        PRINT("Could not find file.");
-        return -1;
-    }
-
-    File f = AMIIBUDDY_FS_DEFAULT.open(filePath, FILE_READ);
+    File f;
+    FSTools::openForRead(filePath.c_str(), &f);
 
     if (! f) {
         PRINT("Could not open file.");
         return -2;
     }
 
-    AmiiboDataDoc jsonDoc;
-    deserializeJson(jsonDoc, f);
+//    AmiiboDataDoc jsonDoc;
+//    deserializeJson(jsonDoc, f);
 
     f.close();
 
-    serializeJsonPretty(jsonDoc, Serial);
-
-    JsonObject obj = jsonDoc.as<JsonObject>();
-
-    for (auto pair : obj) {
-        String k(pair.key().c_str());
-        String v = pair.value().as<String>();
-        callback(k, v);
-    }
+//    serializeJsonPretty(jsonDoc, Serial);
+//
+//    JsonObject obj = jsonDoc.as<JsonObject>();
+//
+//    if (callback != nullptr) {
+//        for (auto pair : obj) {
+//            String k(pair.key().c_str());
+//            String v = pair.value().as<String>();
+//            callback(k, v);
+//        }
+//    }
 
     return 0;
 }
 
 int AmiiboDatabase::search(const char* text, const search_callback_t& callback) {
-    DynamicJsonDocument fullRef(AMIIBO_SEARCH_FILE_SIZE);
 
-    PRINTV("Looking for search file: ", AMIIBO_SEARCH_FILE_PATH);
-
-    if (! AMIIBUDDY_FS_DEFAULT.exists(AMIIBO_SEARCH_FILE_PATH)) {
-        return -1;
-    }
-
-    File f = AMIIBUDDY_FS_DEFAULT.open(AMIIBO_SEARCH_FILE_PATH, FILE_READ);
-    if (! f) {
-        return -2;
-    }
-
-    deserializeJson(fullRef, f);
-    f.close();
-
-    printHeapUsage();
-
-    JsonObject db = fullRef.as<JsonObject>();
-    String searchText = String(text);
-    searchText.toLowerCase();
-
-    printHeapUsage();
-
-    for (auto pair : db) {
-        String k(pair.key().c_str());
-        String v = pair.value().as<String>();
-        v.toLowerCase();
-        if (v.indexOf(text) > -1) {
-            String r = pair.value().as<String>();
-            PRINTV("Found key:", k);
-            r = r.substring(r.lastIndexOf("/") + 1);
-            PRINTV("Found value:", r);
-            callback(k, r);
-            PRINTLN("Inserted");
-        }
-    }
+//    JsonObject db = fullRef.as<JsonObject>();
+//    String searchText = String(text);
+//    searchText.toLowerCase();
+//
+//    printHeapUsage();
+//
+//    if (callback != nullptr) {
+//        for (auto pair : db) {
+//            String k(pair.key().c_str());
+//            String v = pair.value().as<String>();
+//            v.toLowerCase();
+//            if (v.indexOf(text) > -1) {
+//                String r = pair.value().as<String>();
+//                PRINTV("Found key:", k);
+//                r = r.substring(r.lastIndexOf("/") + 1);
+//                PRINTV("Found value:", r);
+//                callback(k, r);
+//                PRINTLN("Inserted");
+//            }
+//        }
+//    }
 
     printHeapUsage();
     return 0;
 }
 
 int AmiiboDatabase::findByData(const uint8_t* data, const search_callback_t& callback) {
-    amiiBuddy.loadKey();
+    atool.loadKey(KEY_FILE);
     atool.loadFileFromData(data, NTAG215_SIZE, false);
 
     char hash[33] = "";
-    AmiiboDatabaseManager::calculateAmiiboInfoHash(&atool.amiiboInfo, hash);
-
+    AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, hash);
+    PRINTV("Hash: ", hash);
     String filePath = String(AMIIBO_DATA_FILE_PATH) + "/" + hash + ".json";
 
     PRINTV("Looking up file: ", filePath);
 
-    if (! AMIIBUDDY_FS_DEFAULT.exists(filePath)) {
-        PRINT("Could not find file.");
-        return -1;
-    }
+//    char saveChecksum[AMIIBO_SAVE_CHECKSUM_LEN];
+//    AmiiboDatabaseManager::calculateSaveHash(data, saveChecksum);
 
-    uint8_t saveChecksum[AMIIBO_SAVE_CHECKSUM_LEN];
-    AmiiboDatabaseManager::getSaveChecksum(data, saveChecksum);
-
-    File f = AMIIBUDDY_FS_DEFAULT.open(filePath, FILE_READ);
+    File f;
+    FSTools::openForRead(filePath.c_str(), &f);
 
     if (! f) {
         PRINT("Could not open file.");
         return -2;
     }
 
-    AmiiboDataDoc jsonDoc;
-    deserializeJson(jsonDoc, f);
+//    AmiiboDataDoc jsonDoc;
+//    deserializeJson(jsonDoc, f);
 
     f.close();
 
-    serializeJsonPretty(jsonDoc, Serial);
+//    serializeJsonPretty(jsonDoc, Serial);
 
-    JsonObject obj = jsonDoc.as<JsonObject>();
+//    JsonObject obj = jsonDoc.as<JsonObject>();
+//
+//    if (callback != nullptr) {
+//        for (auto pair : obj) {
+//            String key = String(pair.key().c_str());
+//            String val = pair.value().as<String>();
+//            callback(key, val);
+//        }
+//    }
 
-    for (auto pair : obj) {
-        String key = String(pair.key().c_str());
-        String val = pair.value().as<String>();
-        callback(key, val);
+    return 0;
+}
+
+int AmiiboDatabase::writeSave(const char* amiibo_hash, const char* save_hash, const char* save_name, const uint8_t* data) {
+    String dataPath = String(SAVES_PATH) + "/" + amiibo_hash + "/" + save_hash + ".bin";
+
+    int writeResult = FSTools::writeData(dataPath.c_str(), data, NTAG215_SIZE);
+    if (writeResult < 0) {
+        return writeResult;
     }
+
+    String path = String(AMIIBO_SAVE_FILE_PATH) + "/" + amiibo_hash + ".user.json";
+
+//    DynamicJsonDocument jsonDoc(AMIIBO_SEARCH_FILE_SIZE);
+//    File f = AMIIBUDDY_FS_DEFAULT.open(path, FILE_READ);
+//
+//    if (! f) {
+//        return -2;
+//    }
+//
+//    deserializeJson(jsonDoc, f);
+//    f.close();
+//
+//    std::map<String, String> newFile;
+//    newFile[save_hash] = path + "|" + save_name;
+//
+//    JsonObject obj = jsonDoc.as<JsonObject>();
+//    for (auto pair : obj) {
+//        newFile[pair.key().c_str()] = pair.value().as<String>();
+//    }
+//
+//    jsonDoc.clear();
+//
+//    for (const auto& pair : newFile) {
+//        jsonDoc[pair.first] = pair.second;
+//    }
+//
+//    File* fr;
+//    openForWrite(path.c_str(), fr);
+//
+//    if (! *fr) {
+//        return -2;
+//    }
+//
+//    serializeJson(jsonDoc, *fr);
+//
+//    fr->close();
+
+    return 0;
+}
+
+int AmiiboDatabase::removeSave(const char* amiibo_hash, const char* save_hash) {
+    String path = String(SAVES_PATH) + "/" + amiibo_hash + "/" + save_hash + ".bin";
+
+    FSTools::remove(path.c_str());
+
+    path = String(AMIIBO_SAVE_FILE_PATH) + "/" + amiibo_hash + ".user.json";
+
+//    DynamicJsonDocument jsonDoc(AMIIBO_SEARCH_FILE_SIZE);
+//    File f = AMIIBUDDY_FS_DEFAULT.open(path, FILE_READ);
+//
+//    if (! f) {
+//        return -2;
+//    }
+//
+//    deserializeJson(jsonDoc, f);
+//    f.close();
+//
+//    jsonDoc.remove(save_hash);
+//
+//    File* fr;
+//    openForWrite(path.c_str(), fr);
+//
+//    if (! *fr) {
+//        return -2;
+//    }
+//
+//    serializeJson(jsonDoc, *fr);
+//
+//    fr->close();
 
     return 0;
 }
@@ -190,8 +300,12 @@ void initializeDatabase() {
 }
 
 bool AmiiboDatabase::begin() {
-    ezSettings::menuObj.addItem("Re-initialize database", initializeDatabase);
+    if (! AmiiboDBAO::begin()) {
+        M5ez::msgBox(TEXT_WARNING, "Could not initialize the database.", TEXT_DISMISS);
+        return false;
+    }
 
+    ezSettings::menuObj.addItem("Re-initialize database", initializeDatabase);
     return true;
 }
 

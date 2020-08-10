@@ -10,7 +10,7 @@
 #include "AmiiboDatabase.h"
 #include "NTag215.h"
 
-#define KEY_FILE "/keys/retail.bin"
+#define KEY_FILE "/sd/keys/retail.bin"
 
 
 class AmiiBuddy {

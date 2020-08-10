@@ -6,6 +6,8 @@ Initially started from [Wifiibo](https://github.com/Xerxes3rd/Wifiibo),
 
 Uses [M5ez](https://github.com/ropg/M5ez) for the user interface.
 
+See it in action [from my preview post on reddit](https://www.reddit.com/r/Amiibomb/comments/hvc36t/it_was_suggested_i_post_this_here_several_weeks/).
+
 ## General info
 
 Hardware Pieces:
@@ -25,3 +27,11 @@ Hardware Pieces:
 7. Run PlatformIO to compile and load the software
 
 More details coming later...
+
+## Must use low SPIFF partitions
+
+```
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=         ]  10.1% (used 54032 bytes from 532480 bytes)
+Flash: [=======   ]  72.3% (used 1421010 bytes from 1966080 bytes)
+```

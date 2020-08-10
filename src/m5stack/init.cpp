@@ -7,8 +7,8 @@
 #include "init.h"
 #include <Wire.h>
 #include <PN532_I2C.h>
-#include <NfcAdapter.h>
 #include <SD.h>
+#include <FSTools.h>
 #include "firmware.h"
 #include "classes/BatteryMonitor.h"
 #include "classes/NFCMonitor.h"
@@ -80,5 +80,6 @@ void showInit() {
 }
 
 void runInit() {
+    FSTools::init();
     showInit();
 }

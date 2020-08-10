@@ -23,7 +23,8 @@ int byteToChar(const uint8_t *src, size_t srcLen, char *dest, size_t destLen);
 int charToByte(const char *src, size_t srcLen, uint8_t *dest, size_t destLen);
 void printAmiiboKeysValidation(const char *prefix, const nfc3d_amiibo_keys *keys);
 void processRawAmiiboKeyData(const uint8_t *amiiboKeyRawData, nfc3d_amiibo_keys *keys);
-void printAmiibo(amiiboInfoStruct info);
+String fileToAmiiboName(const String& filePath);
+void printAmiibo(amiiboInfoStruct& info);
 void printHeapUsage();
 
 #endif //WIFIIBO_CLION_UTILS_H

@@ -6,7 +6,7 @@
 #include <ArduinoDebug.h>
 #include "AmiiBuddy.h"
 #include <M5ez.h>
-#include "../fs_tools.h"
+#include <FSTools.h>
 
 nfc3d_amiibo_keys amiiboKeyData;
 uint8_t * amiiboKeyDataBytes = reinterpret_cast<uint8_t*>(&amiiboKeyData);
@@ -23,7 +23,7 @@ void AmiiBuddy::begin(FS* fs, PN532* nfc, AmiiboDatabase* db) {
 
 bool AmiiBuddy::loadKey() {
     if (! _hasCachedKey) {
-        readData(KEY_FILE, amiiboKeyDataBytes, AMIIBO_KEY_FILE_SIZE);
+        FSTools::readData(KEY_FILE, amiiboKeyDataBytes, AMIIBO_KEY_FILE_SIZE);
         PRINTLN("Key data: ");
         PRINTHEX(amiiboKeyDataBytes, AMIIBO_KEY_FILE_SIZE);
 
@@ -36,7 +36,7 @@ int AmiiBuddy::writeAmiibo(NTag215 *tag, const char *path) {
     if (path != nullptr) {
         PRINT("Reading: ");
         PRINTLN(path);
-        if (readData(path, tag->data, NTAG215_SIZE) != 0) {
+        if (FSTools::readData(path, tag->data, NTAG215_SIZE) != 0) {
             return -1;
         }
     } else {
