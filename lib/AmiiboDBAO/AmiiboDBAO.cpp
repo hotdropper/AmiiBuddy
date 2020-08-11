@@ -9,7 +9,7 @@
 #include <MD5Builder.h>
 #include <FS.h>
 
-//#define DEBUG_SQL
+#define DEBUG_SQL
 
 #define KEY_FILE "/sd/keys/retail.bin"
 
@@ -202,10 +202,22 @@ bool AmiiboDBAO::truncate() {
     return true;
 }
 
-
 void AmiiboDBAO::calculateSaveHash(uint8_t* tagData, char* checksum) {
+    atool.loadKey(KEY_FILE);
+    atool.loadFileFromData(tagData, NTAG215_SIZE, false);
     md5Builder.begin();
-    md5Builder.add((uint8_t*) &tagData[AMIIBO_SAVE_CHECKSUM_POS], AMIIBO_SAVE_CHECKSUM_BYTE_LEN);
+    // ami nb counter
+    md5Builder.add(&atool.modified[0x29], 2);
+    // flags
+    md5Builder.add(&atool.modified[0x2C], 1);
+    // program id
+    md5Builder.add(&atool.modified[0xAC], 8);
+    // cfg nb counter
+    md5Builder.add(&atool.modified[0xB4], 2);
+    // app id
+    md5Builder.add(&atool.modified[0xB6], 4);
+    // data
+    md5Builder.add(&atool.modified[0xDC], 216);
     md5Builder.calculate();
     return md5Builder.getChars(checksum);
 }
@@ -262,8 +274,8 @@ void readSaveFromResult(sqlite3_stmt* stmt, SaveRecord& save) {
     save.is_custom = sqlite3_column_int(stmt, 6) == 1;
 }
 
-bool prepareStatement(const char* sql, sqlite3_stmt* stmt, const char* stmtTail) {
-    rc = sqlite3_prepare_v2(dbh, sql, strlen(sql), &stmt, &stmtTail);
+bool prepareStatement(const char* sql, sqlite3_stmt** stmt, const char* stmtTail) {
+    rc = sqlite3_prepare_v2(dbh, sql, strlen(sql), stmt, &stmtTail);
     if (rc != SQLITE_OK) {
         Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
         return false;
@@ -308,7 +320,7 @@ bool readSavesFromQuery(sqlite3_stmt* stmt, int limit, SaveRecord& save, const s
 }
 
 int AmiiboDBAO::findAmiiboIdByHash(const char* hash) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, &res, tail)) {
         return -1;
     }
 
@@ -338,7 +350,7 @@ int AmiiboDBAO::findAmiiboIdByHash(const char* hash) {
 }
 
 bool AmiiboDBAO::findAmiiboById(const int id, AmiiboRecord& amiibo) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, &res, tail)) {
         return false;
     }
 
@@ -354,7 +366,7 @@ bool AmiiboDBAO::findAmiiboById(const int id, AmiiboRecord& amiibo) {
 }
 
 bool AmiiboDBAO::findSaveById(const int id, SaveRecord& save) {
-    if (! prepareStatement(SQL_SELECT_SAVE_BY_ID, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_SAVE_BY_ID, &res, tail)) {
         return false;
     }
 
@@ -370,11 +382,14 @@ bool AmiiboDBAO::findSaveById(const int id, SaveRecord& save) {
 }
 
 bool AmiiboDBAO::findAmiiboByHash(const char* hash, AmiiboRecord& amiibo) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_HASH, res, tail)) {
+    PRINTV("Query Template:", SQL_SELECT_AMIIBO_BY_HASH);
+    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_HASH, &res, tail)) {
         return false;
     }
 
-    sqlite3_bind_text(res, 1, hash, sizeof(AmiiboRecord::hash), SQLITE_TRANSIENT);
+    PRINTV("Hash:", hash);
+
+    sqlite3_bind_text(res, 1, hash, strlen(hash), SQLITE_TRANSIENT);
 
 #ifdef DEBUG_SQL
     char* sqlBuff = sqlite3_expanded_sql(res);
@@ -386,7 +401,7 @@ bool AmiiboDBAO::findAmiiboByHash(const char* hash, AmiiboRecord& amiibo) {
 }
 
 bool AmiiboDBAO::findAmiiboByFileName(const char *filename, AmiiboRecord &amiibo) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_NAME, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_NAME, &res, tail)) {
         return false;
     }
 
@@ -402,7 +417,7 @@ bool AmiiboDBAO::findAmiiboByFileName(const char *filename, AmiiboRecord &amiibo
 }
 
 bool AmiiboDBAO::findAmiibosByFileNameMatch(const char* filename, const std::function<void(AmiiboRecord& record)>& callback, int limit) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_LIKE, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_LIKE, &res, tail)) {
         return false;
     }
 
@@ -414,7 +429,7 @@ bool AmiiboDBAO::findAmiibosByFileNameMatch(const char* filename, const std::fun
 }
 
 bool AmiiboDBAO::findSavesByAmiiboHash(const char* hash, const std::function<void(SaveRecord& record)>& callback, int limit) {
-    if (! prepareStatement(SQL_SELECT_SAVE_BY_AMIIBO_HASH, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_SAVE_BY_AMIIBO_HASH, &res, tail)) {
         return false;
     }
 
@@ -425,7 +440,7 @@ bool AmiiboDBAO::findSavesByAmiiboHash(const char* hash, const std::function<voi
 
 bool AmiiboDBAO::findSavesByAmiiboFileName(const char* filename, const std::function<void(SaveRecord& record)>& callback, int limit) {
     PRINTLN("Preparing statement");
-    if (! prepareStatement(SQL_SELECT_SAVE_BY_AMIIBO_FILE, res, tail)) {
+    if (! prepareStatement(SQL_SELECT_SAVE_BY_AMIIBO_FILE, &res, tail)) {
         return false;
     }
 
@@ -450,7 +465,7 @@ bool executeStatement(sqlite3_stmt* stmt) {
 }
 
 bool AmiiboDBAO::updateAmiiboTimestamp(const int id, const int timestamp) {
-    if (! prepareStatement(SQL_UPDATE_AMIIBO_TIMESTAMP_BY_ID, res, tail)) {
+    if (! prepareStatement(SQL_UPDATE_AMIIBO_TIMESTAMP_BY_ID, &res, tail)) {
         return false;
     }
 
@@ -462,7 +477,7 @@ bool AmiiboDBAO::updateAmiiboTimestamp(const int id, const int timestamp) {
 
 bool AmiiboDBAO::updateSaveTimestamp(const int id, const int timestamp) {
     AmiiboDBAO::findSaveById(id, saveRecordBuff);
-    if (! prepareStatement(SQL_UPDATE_SAVE_TIMESTAMP_BY_ID, res, tail)) {
+    if (! prepareStatement(SQL_UPDATE_SAVE_TIMESTAMP_BY_ID, &res, tail)) {
         return false;
     }
 

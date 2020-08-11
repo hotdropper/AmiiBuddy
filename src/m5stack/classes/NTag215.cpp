@@ -172,7 +172,8 @@ int NTag215::readAmiibo() {
     PRINTV("Halt result: ", cmdResult);
 
     PRINTLN("Done.");
-    PRINTHEXV("Read tag data: ", data, NTAG215_SIZE);
+    PRINTLN("Read tag data: ");
+    PRINTHEX(data, NTAG215_SIZE);
 
     return 0;
 }

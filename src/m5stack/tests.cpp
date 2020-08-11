@@ -2,7 +2,7 @@
 // Created by Jacob Mather on 8/10/20.
 //
 
-#define UNIT_TEST
+//#define UNIT_TEST
 #ifdef UNIT_TEST
 #include "tests.h"
 
@@ -28,15 +28,15 @@
 AmiiboRecord aIsabelle;
 const char aIsabelleHash[33] = "596b6bf33fbbcea4d653e78738a763f0";
 SaveRecord sIsabelle;
-const char sIsabelleHash[33] = "af0d18859d0b6c502d03f8a7cda9222b";
+const char sIsabelleHash[33] = "0185f92238ec9d87cec105ea973a7e79";
 SaveRecord sIsabelleMH;
-const char sIsabelleMHHash[33] = "b52108fab0041563e3811aaf80e6a5eb";
+const char sIsabelleMHHash[33] = "d03cc8c3ec2704739584cb303b760dea";
 SaveRecord sIsabelleVG;
-const char sIsabelleVGHash[33] = "a00c34b9c3b579b0ec84923b51761274";
+const char sIsabelleVGHash[33] = "d1a25dceda1d1db0215dc6b587db2859";
 AmiiboRecord aKiki;
 const char aKikiHash[33] = "dff0306e3c4b99b6d18409929c81a488";
 SaveRecord sKiki;
-const char sKikiHash[33] = "a43d8cf2ee5ae2cd6544c7029079df5d";
+const char sKikiHash[33] = "0e6248a9b9c282705432d3238c6aa048";
 
 void test_setup() {
     const uint8_t isabelleHead[4] = { 0x01, 0x81, 0x00, 0x01 };

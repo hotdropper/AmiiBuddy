@@ -80,8 +80,11 @@ void selectFile(const char* filename) {
 
     MagicNTag215 tag;
     FSTools::readData(fileToLoad.c_str(), tag.data, NTAG215_SIZE);
-
     atool.loadKey(KEY_FILE);
+    atool.loadFileFromData(tag.data, NTAG215_SIZE, false);
+    atool.encryptLoadedFile(tag.uid);
+    memcpy(tag.data, atool.original, NTAG215_SIZE);
+
     int burn = nfcMonitor.monitorAmiiboWrite(pb, &tag);
 
     PRINT("Got burn result: ");
@@ -338,12 +341,11 @@ void doRead() {
     PRINTLN("Tag Data");
     PRINTHEX(tag.data, NTAG215_SIZE);
 
-    amiiBuddy.loadKey();
     char amiiboHash[AMIIBO_HASH_LEN];
     char saveHash[AMIIBO_HASH_LEN];
-    AmiiboDBAO::calculateSaveHash(tag.data, saveHash);
     AmiiboDBAO::calculateAmiiboInfoHash(tag.data, amiiboHash);
-
+    M5ez::yield();
+    AmiiboDBAO::calculateSaveHash(tag.data, saveHash);
     printAmiibo(atool.amiiboInfo);
     PRINTV("Amiibo Hash: ", amiiboHash);
     PRINTV("Save Hash: ", saveHash);
@@ -357,7 +359,7 @@ void doRead() {
     bool sawSaveHash = false;
     int customSaveCount = 0;
     int saveLookupResult = AmiiboDBAO::findSavesByAmiiboHash(amiiboHash, [&myMenu, &sawSaveHash, &saveHash, &customSaveCount](SaveRecord& save) {
-        if (save.hash == saveHash) {
+        if (strcmp(save.hash, saveHash) == 0) {
             sawSaveHash = true;
         }
 
@@ -379,7 +381,7 @@ void doRead() {
 
     if (sawSaveHash) {
         String msg("We would recognize ");
-        msg = msg + amiibo.name + " anywhere! We found no changes.";
+        msg = msg + amiibo.name + " anywhere!\nWe found no changes.";
         M5ez::msgBox(TEXT_SUCCESS, msg, TEXT_OK);
         return;
     }

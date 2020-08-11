@@ -17,3 +17,4 @@ dist/
 .travis.yml
 .pio
 .idea
+sd/*

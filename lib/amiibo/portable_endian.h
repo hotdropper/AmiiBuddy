@@ -47,7 +47,34 @@
 
 #elif defined(__XTENSA__)
 
-#		include <machine/endian.h>
+#include <machine/endian.h>
+#if BYTE_ORDER == LITTLE_ENDIAN
+
+#define htobe16 swap16
+#define htobe32 swap32
+#define betoh16 swap16
+#define betoh32 swap32
+
+#define htole16(x) (x)
+#define htole32(x) (x)
+#define letoh16(x) (x)
+#define letoh32(x) (x)
+
+#endif /* __BYTE_ORDER__ */
+
+#if BYTE_ORDER == BIG_ENDIAN
+
+#define htole16 swap16
+#define htole32 swap32
+#define letoh16 swap16
+#define letoh32 swap32
+
+#define htobe16(x) (x)
+#define htobe32(x) (x)
+#define betoh16(x) (x)
+#define betoh32(x) (x)
+
+#endif /* __BYTE_ORDER__ */
 
 #elif defined(__NetBSD__) || defined(__FreeBSD__) || defined(__DragonFly__)
 
@@ -121,5 +148,49 @@
 #       error platform not supported
 
 #endif
+
+#include <machine/endian.h>
+#if BYTE_ORDER == LITTLE_ENDIAN
+
+typedef unsigned short int      U16;  //!< 16-bit unsigned integer.
+typedef unsigned long int       U32;  //!< 32-bit unsigned integer.
+#define Swap16(u16) ((U16)(((U16)(u16) >> 8) |\
+                           ((U16)(u16) << 8)))
+#define Swap32(u32) ((U32)(((U32)Swap16((U32)(u32) >> 16)) |\
+                           ((U32)Swap16((U32)(u32)) << 16)))
+
+#define htobe16 Swap16
+#define htobe32 Swap32
+#define h16tobe Swap16
+#define h32tobe Swap32
+#define betoh16 Swap16
+#define betoh32 Swap32
+#define be16toh Swap16
+#define be32toh Swap32
+
+#define htole16(x) (x)
+#define htole32(x) (x)
+#define letoh16(x) (x)
+#define letoh32(x) (x)
+#define h16tole(x) (x)
+#define h32tole(x) (x)
+#define le16toh(x) (x)
+#define le32toh(x) (x)
+
+#endif /* __BYTE_ORDER__ */
+
+#if BYTE_ORDER == BIG_ENDIAN
+
+#define htole16 Swap16
+#define htole32 Swap32
+#define letoh16 Swap16
+#define letoh32 Swap32
+
+#define htobe16(x) (x)
+#define htobe32(x) (x)
+#define betoh16(x) (x)
+#define betoh32(x) (x)
+
+#endif /* __BYTE_ORDER__ */
 
 #endif

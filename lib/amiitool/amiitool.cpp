@@ -1,5 +1,5 @@
 
-#define PRINT_DEBUG 0
+#define PRINT_DEBUG 1
 #include <ArduinoDebug.h>
 #include <FSTools.h>
 #include "amiitool.h"
@@ -17,9 +17,11 @@ bool keyValid(nfc3d_amiibo_keys * amiiboKeys)
 {
     if ((amiiboKeys->data.magicBytesSize > 16) ||
         (amiiboKeys->tag.magicBytesSize > 16)) {
+        PRINTLN("Key is not valid.");
         return false;
     }
 
+    PRINTLN("Key is valid.");
     return true;
 }
 
@@ -160,8 +162,10 @@ bool amiitool::loadFileFromData(const uint8_t * filedata, int size, bool lenient
 	{
 		if (isEncrypted(filedata))
 		{
+		    PRINTLN("Is Encrypted.");
 			if (original != filedata)
 			{
+			    PRINTLN("Copying data over...");
 				memcpy(original, filedata, NTAG215_SIZE);
 			}
 			if (decryptLoadedFile(lenient) >= 0)
@@ -171,6 +175,7 @@ bool amiitool::loadFileFromData(const uint8_t * filedata, int size, bool lenient
 		}
 		else
 		{
+            PRINTLN("Not Encrypted.");
 			memcpy(modified, filedata, NFC3D_AMIIBO_SIZE);
 			fileloaded = true;
 		}
@@ -331,7 +336,12 @@ int amiitool::decryptLoadedFile(bool lenient)
 {
 	if (amiitool::isKeyLoaded())
 	{
+	    PRINTLN("Key loaded.");
 		//printData(original, NTAG215_SIZE, 16, true, false);
+		PRINTLN("Key Data");
+		PRINTHEX(amiiboKeyBytes, AMIIBO_KEY_FILE_SIZE);
+        PRINTLN("Tag Data");
+        PRINTHEX(original, NTAG215_SIZE);
 		if (!nfc3d_amiibo_unpack(&amiiboKeys, original, modified)){
 		    PRINTLN("amiitool.decryptLoadedFile: unpack failed");
             if (!lenient) {

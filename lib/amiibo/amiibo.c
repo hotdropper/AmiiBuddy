@@ -10,10 +10,10 @@
 #include <mbedtls/md.h>
 #include <mbedtls/aes.h>
 #include <stdio.h> // for size_t
+#include <string.h> // for mem* functions
 #include <errno.h>
 #include "portable_endian.h"
 //#include <Crypto.h>
-
 
 #define HMAC_POS_DATA 0x008
 #define HMAC_POS_TAG 0x1B4
