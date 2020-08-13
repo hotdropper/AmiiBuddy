@@ -64,6 +64,7 @@ void FSTools::traverseEntries(FS* fs, std::list<String>& dirs, const bool recurs
             }
         }
         dir.close();
+        dirs.remove(dirPath);
     }
 }
 
