@@ -358,6 +358,8 @@ bool AmiiboDatabaseManager::initialize(const char* library_path, const char* pow
 
     rebuildCustomSaveData(custom_saves_path);
 
+    AmiiboDBAO::end();
+
     ESP.restart();
     return true;
 }

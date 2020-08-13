@@ -9,7 +9,7 @@
 #include <MD5Builder.h>
 #include <FS.h>
 
-//#define DEBUG_SQL
+#define DEBUG_SQL
 
 #define KEY_FILE "/sd/keys/retail.bin"
 
@@ -48,6 +48,8 @@ AmiiboHashDetails amiiboHashDetailsCache;
 auto * amiiboHashDetailsCacheBytes = reinterpret_cast<uint8_t*>(&amiiboHashDetailsCache);
 MD5Builder md5Builder = MD5Builder();
 sqlite3_stmt *res;
+sqlite3_stmt *insertAmiiboStatement = nullptr;
+sqlite3_stmt *insertSaveStatement = nullptr;
 const char *tail;
 int rc = 0;
 char adbaoHashCache[33];
@@ -59,6 +61,7 @@ AmiiboRecord amiiboRecordBuff = AmiiboRecord();
 int i;
 int countBuff;
 unsigned long start;
+int updateCount = 0;
 
 static int callback(void *data, int argc, char **argv, char **azColName){
     Serial.printf("%s: ", (const char*)data);
@@ -113,78 +116,108 @@ bool AmiiboDBAO::end() {
     return true;
 }
 
+void maybeFlush() {
+    updateCount++;
+
+    if (updateCount > 250) {
+        PRINTLN("Flushing DB to disk...");
+        if (sqlite3_db_cacheflush(dbh) != SQLITE_OK) {
+            PRINTLN("Flush failed?!?!");
+        }
+        PRINTLN("Attempting to free up some memory...");
+        if (sqlite3_db_release_memory(dbh) != SQLITE_OK) {
+            PRINTLN("Freeing memory failed?!?!");
+        }
+        updateCount = 0;
+    }
+}
+
 bool AmiiboDBAO::insertAmiibo(AmiiboRecord& amiibo) {
-    rc = sqlite3_prepare_v2(dbh, SQL_INSERT_AMIIBO, strlen(SQL_INSERT_AMIIBO), &res, &tail);
-    if (rc != SQLITE_OK) {
-        Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
-        return false;
+    if (insertAmiiboStatement == nullptr) {
+        rc = sqlite3_prepare_v2(dbh, SQL_INSERT_AMIIBO, strlen(SQL_INSERT_AMIIBO), &insertAmiiboStatement, &tail);
+        if (rc != SQLITE_OK) {
+            Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
+            return false;
+        }
     }
 
-    sqlite3_bind_text(res, 1, amiibo.name, strlen(amiibo.name), SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 2, amiibo.amiiboName, strlen(amiibo.ownerName), SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 3, amiibo.ownerName, strlen(amiibo.ownerName), SQLITE_TRANSIENT);
-    sqlite3_bind_blob(res, 4, &amiibo.variation, 1, SQLITE_TRANSIENT);
-    sqlite3_bind_blob(res, 5, &amiibo.form, 1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(res, 6, amiibo.number);
-    sqlite3_bind_blob(res, 7, &amiibo.set, 1, SQLITE_TRANSIENT);
-    sqlite3_bind_blob(res, 8, &amiibo.head, 4, SQLITE_TRANSIENT);
-    sqlite3_bind_blob(res, 9, &amiibo.tail, 4, SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 10, amiibo.file, strlen(amiibo.file), SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 11, amiibo.hash, 32, SQLITE_TRANSIENT);
-    sqlite3_bind_int(res, 12, amiibo.last_written);
+    sqlite3_bind_text(insertAmiiboStatement, 1, amiibo.name, strlen(amiibo.name), SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertAmiiboStatement, 2, amiibo.amiiboName, strlen(amiibo.ownerName), SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertAmiiboStatement, 3, amiibo.ownerName, strlen(amiibo.ownerName), SQLITE_TRANSIENT);
+    sqlite3_bind_blob(insertAmiiboStatement, 4, &amiibo.variation, 1, SQLITE_TRANSIENT);
+    sqlite3_bind_blob(insertAmiiboStatement, 5, &amiibo.form, 1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insertAmiiboStatement, 6, amiibo.number);
+    sqlite3_bind_blob(insertAmiiboStatement, 7, &amiibo.set, 1, SQLITE_TRANSIENT);
+    sqlite3_bind_blob(insertAmiiboStatement, 8, &amiibo.head, 4, SQLITE_TRANSIENT);
+    sqlite3_bind_blob(insertAmiiboStatement, 9, &amiibo.tail, 4, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertAmiiboStatement, 10, amiibo.file, strlen(amiibo.file), SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertAmiiboStatement, 11, amiibo.hash, 32, SQLITE_TRANSIENT);
+    sqlite3_bind_int(insertAmiiboStatement, 12, amiibo.last_written);
 
 #ifdef DEBUG_SQL
-    sqlBuff = sqlite3_expanded_sql(res);
+    sqlBuff = sqlite3_expanded_sql(insertAmiiboStatement);
     PRINTV("INSERT:", sqlBuff);
     sqlite3_free(sqlBuff);
 #endif
 
-    if (sqlite3_step(res) != SQLITE_DONE) {
+    PRINTV("Attempting to insert amiibo hash:", amiibo.hash);
+    if (sqlite3_step(insertAmiiboStatement) != SQLITE_DONE) {
         Serial.printf("ERROR executing stmt: %s\n", sqlite3_errmsg(dbh));
+        sqlite3_clear_bindings(insertAmiiboStatement);
+        sqlite3_reset(insertAmiiboStatement);
+
         return false;
     }
 
 //    PRINTV("Inserting hash:", amiibo.hash);
 
-    sqlite3_clear_bindings(res);
-    sqlite3_reset(res);
+    sqlite3_clear_bindings(insertAmiiboStatement);
+    sqlite3_reset(insertAmiiboStatement);
     amiibo.id = sqlite3_last_insert_rowid(dbh);
-    sqlite3_finalize(res);
+//    sqlite3_finalize(res);
     PRINTV("Inserted amiibo id:", amiibo.id);
 
+//    maybeFlush();
     return true;
 }
 
 bool AmiiboDBAO::insertSave(SaveRecord& save) {
-    rc = sqlite3_prepare_v2(dbh, SQL_INSERT_SAVE, strlen(SQL_INSERT_SAVE), &res, &tail);
-    if (rc != SQLITE_OK) {
-        Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
-        return false;
+    if (insertSaveStatement == nullptr) {
+        rc = sqlite3_prepare_v2(dbh, SQL_INSERT_SAVE, strlen(SQL_INSERT_SAVE), &insertSaveStatement, &tail);
+        if (rc != SQLITE_OK) {
+            Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
+            return false;
+        }
     }
 
-    sqlite3_bind_int(res, 1, save.amiibo_id);
-    sqlite3_bind_text(res, 2, save.hash, 32, SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 3, save.name, strlen(save.name), SQLITE_TRANSIENT);
-    sqlite3_bind_text(res, 4, save.file, strlen(save.file), SQLITE_TRANSIENT);
-    sqlite3_bind_int(res, 5, save.last_update);
-    sqlite3_bind_int(res, 6, save.is_custom ? 1 : 0);
+    sqlite3_bind_int(insertSaveStatement, 1, save.amiibo_id);
+    sqlite3_bind_text(insertSaveStatement, 2, save.hash, 32, SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertSaveStatement, 3, save.name, strlen(save.name), SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertSaveStatement, 4, save.file, strlen(save.file), SQLITE_TRANSIENT);
+    sqlite3_bind_int(insertSaveStatement, 5, save.last_update);
+    sqlite3_bind_int(insertSaveStatement, 6, save.is_custom ? 1 : 0);
 
 #ifdef DEBUG_SQL
-    sqlBuff = sqlite3_expanded_sql(res);
+    sqlBuff = sqlite3_expanded_sql(insertSaveStatement);
     PRINTV("INSERT:", sqlBuff);
     sqlite3_free(sqlBuff);
 #endif
 
-    if (sqlite3_step(res) != SQLITE_DONE) {
+    PRINTV("Attempting to insert save hash:", save.hash);
+    if (sqlite3_step(insertSaveStatement) != SQLITE_DONE) {
         Serial.printf("ERROR executing stmt: %s\n", sqlite3_errmsg(dbh));
+        sqlite3_clear_bindings(insertSaveStatement);
+        sqlite3_reset(insertSaveStatement);
+
         return false;
     }
-    sqlite3_clear_bindings(res);
-    sqlite3_reset(res);
+    sqlite3_clear_bindings(insertSaveStatement);
+    sqlite3_reset(insertSaveStatement);
     save.id = sqlite3_last_insert_rowid(dbh);
-    sqlite3_finalize(res);
+//    sqlite3_finalize(res);
     PRINTV("Inserted save id:", save.id);
 
+//    maybeFlush();
     return true;
 }
 
@@ -215,6 +248,7 @@ bool AmiiboDBAO::updateSave(SaveRecord& save) {
     sqlite3_reset(res);
     sqlite3_finalize(res);
 
+//    maybeFlush();
     return true;
 }
 
@@ -509,6 +543,7 @@ bool executeStatement(sqlite3_stmt* stmt) {
     sqlite3_reset(stmt);
     sqlite3_finalize(stmt);
 
+//    maybeFlush();
     return true;
 }
 

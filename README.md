@@ -40,3 +40,21 @@ Flash: [=======   ]  72.9% (used 1433214 bytes from 1966080 bytes)
 
 Increase usStackDepth to 16384 from 8192
 
+## Memory management seems to be working
+
+During a full rebuild...
+
+```
+src/m5stack/classes/AmiiboDatabaseManager.cpp:162 operator()(): Item counter:  368
+src/m5stack/classes/AmiiboDatabaseManager.cpp:163 operator()(): File count:  751
+src/m5stack/utils.cpp:159 printHeapUsage(): Heap usage:  140440 of 318924 (44.02% free)
+src/m5stack/classes/AmiiboDatabaseManager.cpp:174 operator()(): Processing file:  /library/...
+src/m5stack/utils.cpp:159 printHeapUsage(): Heap usage:  140440 of 318924 (44.02% free)
+...
+src/m5stack/classes/AmiiboDatabaseManager.cpp:162 operator()(): Item counter:  750
+src/m5stack/classes/AmiiboDatabaseManager.cpp:163 operator()(): File count:  751
+src/m5stack/utils.cpp:159 printHeapUsage(): Heap usage:  141096 of 319132 (44.20% free)
+src/m5stack/classes/AmiiboDatabaseManager.cpp:174 operator()(): Processing file:  /library/...
+src/m5stack/utils.cpp:159 printHeapUsage(): Heap usage:  141096 of 319132 (44.20% free)
+
+```
