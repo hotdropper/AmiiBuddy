@@ -56,6 +56,9 @@ void fileToAmiiboName(const char* filePath, char* name, size_t nameLen, bool pow
     } else {
         nameStrBuff = nameStrBuff.substring(0, nameStrBuff.indexOf("["));
         nameStrBuff.trim();
+        fileNameStrBuff = fileNameStrBuff.substring(0, fileNameStrBuff.lastIndexOf("/"));
+        fileNameStrBuff = fileNameStrBuff.substring(fileNameStrBuff.lastIndexOf("/") + 1);
+        nameStrBuff = nameStrBuff + " (" + fileNameStrBuff + ")";
     }
 
     strlcpy(name, nameStrBuff.c_str(), nameLen);
@@ -182,11 +185,18 @@ void rebuildFileData(const char* library_path) {
             return;
         }
 
-        printHeapUsage();
+//        printHeapUsage();
         loadAndProcessAmiiboFile(pathBuff, mgrAmiiboBuff);
-        AmiiboDBAO::insertAmiibo(mgrAmiiboBuff);
+        if (AmiiboDBAO::insertAmiibo(mgrAmiiboBuff)) {
+            mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
+        } else if (AmiiboDBAO::findAmiiboByHash(mgrAmiiboBuff.hash, mgrAmiiboBuff)) {
+            mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
+        } else {
+            M5ez::msgBox(TEXT_ERROR, String("Could not load ") + pathBuff, TEXT_OK);
+            incrementProgressValue();
+            return;
+        }
 
-        mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
 //        PRINTV("Save hash:", save.hash);
         AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
 //        PRINTV("Save hash:", save.hash);

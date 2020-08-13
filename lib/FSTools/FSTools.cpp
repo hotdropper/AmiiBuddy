@@ -2,7 +2,7 @@
 // Created by Jacob Mather on 7/31/20.
 //
 
-#define PRINT_DEBUG 1
+#define PRINT_DEBUG 0
 #include <ArduinoDebug.h>
 #include "FSTools.h"
 #include <string>
