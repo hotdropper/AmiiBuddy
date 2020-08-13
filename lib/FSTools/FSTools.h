@@ -27,10 +27,31 @@ class FSTools {
 public:
     static void init();
     static FS* getFSByPath(const char* path, char* outPath);
-    static void traverseEntries(std::list<File>* dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const std::function <void (File*)>& callback);
-    static void traverseEntries(File* dir, const bool recursive, const std::function <void (File*)>& callback);
-    static void traverseFiles(File* dir, const std::function <void (File*)>& callback);
-    static void traverseDirs(File* dir, const std::function <void (File*)>& callback);
+    static void traverseEntries(FS* fs, std::list<String>& dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const std::function <void (File*)>& callback);
+    static void traverseEntries(const char* dir, const bool recursive, const std::function <void (File*)>& callback, FS* fs);
+    static void traverseEntries(const char* dir, const bool recursive, const std::function <void (File*)>& callback) {
+        if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
+            return;
+        }
+
+        return traverseEntries(pathBuffer, recursive, callback, fsBuffer);
+    }
+    static void traverseFiles(const char* dir, const std::function <void (File*)>& callback, FS* fs);
+    static void traverseFiles(const char* dir, const std::function <void (File*)>& callback) {
+        if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
+            return;
+        }
+
+        return traverseFiles(pathBuffer, callback, fsBuffer);
+    }
+    static void traverseDirs(const char* dir, const std::function <void (File*)>& callback, FS* fs);
+    static void traverseDirs(const char* dir, const std::function <void (File*)>& callback) {
+        if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
+            return;
+        }
+
+        return traverseDirs(pathBuffer, callback, fsBuffer);
+    }
     static void forEachDir(const char* path, const std::function <void (const char*)>& callback, FS* fs);
     static void forEachDir(const char* path, const std::function <void (const char*)>& callback) {
         if (! (fsBuffer = getFSByPath(path, pathBuffer))) {
@@ -39,10 +60,10 @@ public:
 
         return forEachDir(pathBuffer, callback, fsBuffer);
     }
-    static void mkdirDeep(const char* path, FS* fs);
-    static void mkdirDeep(const char* path) {
+    static bool mkdirDeep(const char* path, FS* fs);
+    static bool mkdirDeep(const char* path) {
         if (! (fsBuffer = getFSByPath(path, pathBuffer))) {
-            return;
+            return false;
         }
 
         return mkdirDeep(pathBuffer, fsBuffer);
@@ -92,13 +113,24 @@ public:
         return rename(pathBuffer, pathBuffer2, fsBuffer);
     }
 
-    static void remove(const char* path, FS* fs);
-    static void remove(const char* path) {
+    static bool remove(const char* path, FS* fs);
+    static bool remove(const char* path) {
         if (! (fsBuffer = getFSByPath(path, pathBuffer))) {
-            return;
+            return false;
         }
 
         return remove(pathBuffer, fsBuffer);
+    }
+
+    static bool exists(const char* path, FS* fs) {
+        return fs->exists(path);
+    }
+    static bool exists(const char* path) {
+        if (! (fsBuffer = getFSByPath(path, pathBuffer))) {
+            return false;
+        }
+
+        return exists(pathBuffer, fsBuffer);
     }
 
     static int readData(const char *path, uint8_t *data, int dataLength, FS* fs);

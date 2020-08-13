@@ -13,6 +13,7 @@ public:
 
     int reset(const char* newUid);
     int reset();
+    bool wipe();
     int writeAmiibo() override;
     bool setUid(const char* newUid) override;
     bool setVersion(const char* version);

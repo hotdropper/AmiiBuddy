@@ -32,6 +32,11 @@ More details coming later...
 
 ```
 Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
-RAM:   [=         ]  10.1% (used 54032 bytes from 532480 bytes)
-Flash: [=======   ]  72.3% (used 1421010 bytes from 1966080 bytes)
+RAM:   [=         ]  10.8% (used 57744 bytes from 532480 bytes)
+Flash: [=======   ]  72.9% (used 1433214 bytes from 1966080 bytes)
 ```
+
+## Edit ESP32/main.cpp
+
+Increase usStackDepth to 16384 from 8192
+

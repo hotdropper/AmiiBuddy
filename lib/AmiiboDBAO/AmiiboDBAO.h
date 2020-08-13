@@ -12,6 +12,11 @@
 #include <amiitool.h>
 #include <functional>
 
+struct HashInfo {
+    char amiiboHash[33] = "";
+    char saveHash[33] = "";
+};
+
 struct SaveRecord {
     int id = 0;
     int amiibo_id = 0;
@@ -66,8 +71,9 @@ public:
     static bool truncate();
     static bool insertAmiibo(AmiiboRecord& amiibo);
     static bool insertSave(SaveRecord& save);
-    static bool updateAmiiboTimestamp(const int id, const int timestamp);
-    static bool updateSaveTimestamp(const int id, const int timestamp);
+    static bool updateSave(SaveRecord& save);
+    static bool updateAmiiboTimestamp(const int id, const int timestamp = 0);
+    static bool updateSaveTimestamp(const int id, const int timestamp = 0);
     static int findAmiiboIdByHash(const char* hash);
     static bool findAmiiboById(const int id, AmiiboRecord& amiibo);
     static bool findSaveById(const int id, SaveRecord& save);
@@ -76,8 +82,9 @@ public:
     static bool findAmiibosByFileNameMatch(const char* filename, const std::function<void(AmiiboRecord& record)>& callback = nullptr, int limit = 0);
     static bool findSavesByAmiiboHash(const char* hash, const std::function<void(SaveRecord& record)>& callback = nullptr, int limit = 0);
     static bool findSavesByAmiiboFileName(const char* filename, const std::function<void(SaveRecord& record)>& callback = nullptr, int limit = 0);
-    static void calculateSaveHash(uint8_t* tagData, char* checksum);
-    static void calculateAmiiboInfoHash(uint8_t* tagData, char* hash);
+    static void calculateHashes(uint8_t* tagData, HashInfo& hashes);
+    static void calculateHashes(const amiiboInfoStruct& amiiboInfo, HashInfo& hashes);
+    static void calculateSaveHash(const amiiboInfoStruct& amiiboInfo, char* checksum);
     static void calculateAmiiboInfoHash(const amiiboInfoStruct& amiiboInfo, char* hash);
 };
 

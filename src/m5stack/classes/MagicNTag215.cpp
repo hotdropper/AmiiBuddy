@@ -38,10 +38,6 @@ int MagicNTag215::writeAmiibo() {
     reset(uidStr);
 
     for (uint8_t i = 3; i < 133; i++) {
-        if (i % 20 == 0) {
-            M5ez::yield();
-        }
-
         base = i * NTAG215_PAGESIZE;
         uint8_t cmd[] = { 0xA2, i, data[base], data[base + 1], data[base + 2], data[base + 3] };
 
@@ -52,32 +48,30 @@ int MagicNTag215::writeAmiibo() {
         PRINTV("Wrote block", i);
     }
 
-    PRINTLN("Writing data blocks");
-    PRINTHEX(data, NTAG215_SIZE);
-
-    PRINTLN("Setting pack...");
-    if (! setPack("80800000")) {
-        return -4;
-    }
+//    PRINTLN("Writing data blocks");
+//    PRINTHEX(data, NTAG215_SIZE);
 
     PRINTLN("Setting password...");
     if (! setPassword("E9AF1C00")) {
         return -5;
     }
 
+    PRINTLN("Setting pack...");
+    if (! setPack("80800000")) {
+        return -4;
+    }
+
+    sendCommandString("A202E3480FE0");
+
     M5ez::yield();
 
     atool.loadFileFromData(data, NTAG215_SIZE, false);
     printAmiibo(atool.amiiboInfo);
 
-    char amiiboHash[33];
-    AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, amiiboHash);
-
-    char saveHash[AMIIBO_HASH_LEN];
-    AmiiboDBAO::calculateSaveHash(data, saveHash);
-
-    PRINTV("Amiibo Hash: ", amiiboHash);
-    PRINTV("Save Hash: ", saveHash);
+    HashInfo hashes;
+    AmiiboDBAO::calculateHashes(atool.amiiboInfo, hashes);
+    PRINTV("Amiibo Hash: ", hashes.amiiboHash);
+    PRINTV("Save Hash: ", hashes.saveHash);
 
     return 0;
 }
@@ -169,21 +163,11 @@ bool MagicNTag215::setPack(const char* pack) {
 
 #define RETURN_ON_FAIL(c) { if (! c) return retCounter; retCounter++; }
 
-int MagicNTag215::reset(const char* newUid) {
-    uint8_t newUidBytes[strlen(newUid)];
-    charToByte(newUid, strlen(newUid), newUidBytes, sizeof(newUidBytes));
-    int retCounter = 0;
+char tmpl[sizeof(CONFIG_EMPTY_TEMPLATE)];
+char cmdStrBuffer[50];
+uint8_t cmdBuffer[50];
 
-    ENFORCE_INLIST();
-
-    RETURN_ON_FAIL(setPassword("FFFFFFFF"));
-    RETURN_ON_FAIL(setPack("0000"));
-
-    char tmpl[sizeof(CONFIG_EMPTY_TEMPLATE)];
-
-    char cmdStrBuffer[50];
-    uint8_t cmdBuffer[50];
-
+bool MagicNTag215::wipe() {
     for (int b = 3; b <= 0xFB; b++) {
         if (b == 0x29 || b == 0x83 || b == 0xe3) {
             strcpy(tmpl, CONFIG_1_TEMPLATE);
@@ -201,6 +185,26 @@ int MagicNTag215::reset(const char* newUid) {
         if (! sendCommand(cmdBuffer, 6)) {
             return false;
         }
+    }
+
+    return true;
+}
+
+int MagicNTag215::reset(const char* newUid) {
+    PRINTV("Resetting to UID:", newUid);
+
+    uint8_t newUidBytes[strlen(newUid)];
+    charToByte(newUid, strlen(newUid), newUidBytes, sizeof(newUidBytes));
+    int retCounter = 0;
+
+    ENFORCE_INLIST();
+
+//    RETURN_ON_FAIL(setPassword("FFFFFFFF"));
+//    RETURN_ON_FAIL(setPack("0000"));
+
+    if (! wipe()) {
+        PRINTLN("Wipe Failed");
+        return -101;
     }
 
     PRINTLN("** Setting Card Type **");

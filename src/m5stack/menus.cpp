@@ -22,6 +22,7 @@
 bool goHome = false;
 char adjustedPath[200] = "";
 char lastPath[200] = LIBRARY_PATH;
+AmiiboRecord menuAmiiboBuff;
 
 void selectFile(const char* filename) {
     if (! PN532_PRESENT) {
@@ -30,14 +31,24 @@ void selectFile(const char* filename) {
     }
     M5ez::yield();
 
+    MagicNTag215 tag;
+    FSTools::readData(filename, tag.data, NTAG215_SIZE);
+    HashInfo hashes;
+    AmiiboDBAO::calculateHashes(tag.data, hashes);
+    AmiiboDBAO::findAmiiboByHash(hashes.amiiboHash, menuAmiiboBuff);
+
     ezMenu myMenu("Select save?");
     myMenu.buttons("up#Back#select##down#Home");
+    myMenu.txtSmall();
 
     myMenu.addItem("Original|Original Amiibo");
     PRINTLN("Searching");
     printHeapUsage();
-    int saveCount = AmiiboDBAO::findSavesByAmiiboFileName(filename, [&myMenu](SaveRecord& record) {
+    int saveCount = AmiiboDBAO::findSavesByAmiiboHash(hashes.amiiboHash, [&myMenu, &hashes](SaveRecord& record) {
         M5ez::yield();
+        if (strcmp(hashes.saveHash, record.hash) == 0) {
+            return;
+        }
         auto key = new String(record.id);
         *key = *key + "_" + record.file + "|" + record.name;
         myMenu.addItem(*key);
@@ -64,11 +75,12 @@ void selectFile(const char* filename) {
 
         if (myMenu.pickName() == "Original") {
             fileToLoad = filename;
+            AmiiboDBAO::updateAmiiboTimestamp(menuAmiiboBuff.id);
         } else {
             String k = myMenu.pickName();
             int id = k.substring(0, k.indexOf("_")).toInt();
             fileToLoad = k.substring(k.indexOf("_") + 1);
-            AmiiboDBAO::updateSaveTimestamp(id, now());
+            AmiiboDBAO::updateSaveTimestamp(id);
         }
     } else {
         fileToLoad = filename;
@@ -78,8 +90,13 @@ void selectFile(const char* filename) {
 
     PRINTV("File to load:", fileToLoad);
 
-    MagicNTag215 tag;
-    FSTools::readData(fileToLoad.c_str(), tag.data, NTAG215_SIZE);
+    int readResp = FSTools::readData(fileToLoad.c_str(), tag.data, NTAG215_SIZE);
+    if (readResp < 0) {
+        PRINTV("Got read result:", readResp);
+        M5ez::msgBox(TEXT_ERROR, "We were unable to read the file.", TEXT_OK);
+        return;
+    }
+
     atool.loadKey(KEY_FILE);
     atool.loadFileFromData(tag.data, NTAG215_SIZE, false);
     atool.encryptLoadedFile(tag.uid);
@@ -113,10 +130,7 @@ void showBrowse(const char *path) {
     ezProgressBar pb("Listing...", String("Finding files in ") + partialPath);
     M5ez::yield();
 
-    File dir;
-    FSTools::open(path, &dir);
-
-    if (! dir) {
+    if (! FSTools::exists(path)) {
         char msg[80] = "Could not find: ";
         strcat(msg, path);
         M5ez::msgBox("Error", msg);
@@ -125,7 +139,7 @@ void showBrowse(const char *path) {
 
     int counter = -15;
 
-    FSTools::traverseEntries(&dir, false, [&counter, &pb, &filename, &myMenu, &path](File* entry) {
+    FSTools::traverseEntries(path, false, [&counter, &pb, &filename, &myMenu, &path](File* entry) {
         counter++;
         if (counter > 25) {
             counter = 0;
@@ -159,7 +173,6 @@ void showBrowse(const char *path) {
         }
     });
 
-    dir.close();
     M5ez::yield();
     myMenu.runOnce();
     M5ez::yield();
@@ -338,19 +351,17 @@ void doRead() {
             return;
     }
 
-    PRINTLN("Tag Data");
+    PRINTLN("Read Tag Data");
     PRINTHEX(tag.data, NTAG215_SIZE);
 
-    char amiiboHash[AMIIBO_HASH_LEN];
-    char saveHash[AMIIBO_HASH_LEN];
-    AmiiboDBAO::calculateAmiiboInfoHash(tag.data, amiiboHash);
+    HashInfo hashes;
+    AmiiboDBAO::calculateHashes(tag.data, hashes);
     M5ez::yield();
-    AmiiboDBAO::calculateSaveHash(tag.data, saveHash);
     printAmiibo(atool.amiiboInfo);
-    PRINTV("Amiibo Hash: ", amiiboHash);
-    PRINTV("Save Hash: ", saveHash);
+    PRINTV("Amiibo Hash: ", hashes.amiiboHash);
+    PRINTV("Save Hash: ", hashes.saveHash);
     AmiiboRecord amiibo;
-    bool foundAmiibo = AmiiboDBAO::findAmiiboByHash(amiiboHash, amiibo);
+    bool foundAmiibo = AmiiboDBAO::findAmiiboByHash(hashes.amiiboHash, amiibo);
     PRINTV("Found amiibo?", foundAmiibo);
 
     ezMenu myMenu("Save Amiibo");
@@ -358,8 +369,8 @@ void doRead() {
     myMenu.buttons("up#Cancel#Select##down#New");
     bool sawSaveHash = false;
     int customSaveCount = 0;
-    int saveLookupResult = AmiiboDBAO::findSavesByAmiiboHash(amiiboHash, [&myMenu, &sawSaveHash, &saveHash, &customSaveCount](SaveRecord& save) {
-        if (strcmp(save.hash, saveHash) == 0) {
+    int saveLookupResult = AmiiboDBAO::findSavesByAmiiboHash(hashes.amiiboHash, [&myMenu, &sawSaveHash, &hashes, &customSaveCount](SaveRecord& save) {
+        if (strcmp(save.hash, hashes.saveHash) == 0) {
             sawSaveHash = true;
         }
 
@@ -386,17 +397,17 @@ void doRead() {
         return;
     }
 
-    if (sawSaveHash == false) {
-        // new save
-        String msg = String("It looks like ");
-        msg = msg + amiibo.name + " has new data. Save it?";
+    // new save
+    String msg = String("It looks like ");
+    msg = msg + amiibo.name + " has new data. Save it?";
 
-        String button = M5ez::msgBox("Success", msg, "Cancel##Save");
+    String button = M5ez::msgBox("Success", msg, "Cancel##Save");
 
-        if (button == "Cancel") {
-            return;
-        }
-    } else if (customSaveCount > 0) {
+    if (button == "Cancel") {
+        return;
+    }
+
+    if (customSaveCount > 0) {
         myMenu.runOnce();
 
         PRINTV("Selected item name:", myMenu.pickName());
@@ -409,12 +420,24 @@ void doRead() {
         if (myMenu.pickButton() == "Select") {
             String value = myMenu.pickName();
             int saveId = value.substring(0, value.indexOf("_")).toInt();
-            String saveFile = value.substring(value.lastIndexOf("_") + 1);
-            FSTools::remove(saveFile.c_str());
-            FSTools::writeData(saveFile.c_str(), tag.data, NTAG215_SIZE);
-            AmiiboDBAO::updateSaveTimestamp(saveId, now());
-            String msg("We saved ");
-            msg = msg + amiibo.name + " to " + myMenu.pickButton() + ".";
+            String saveFile = value.substring(value.indexOf("_") + 1);
+            if (! FSTools::remove(saveFile.c_str())) {
+                PRINTLN("Could not remove old file.");
+                M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+                return;
+            }
+
+            if (FSTools::writeData(saveFile.c_str(), tag.data, NTAG215_SIZE) != NTAG215_SIZE) {
+                M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+                return;
+            }
+            SaveRecord save;
+            AmiiboDBAO::findSaveById(saveId, save);
+            strcpy(save.hash, hashes.saveHash);
+            AmiiboDBAO::updateSave(save);
+            AmiiboDBAO::updateSaveTimestamp(saveId);
+            msg = String("We saved ");
+            msg = msg + amiibo.name + " as " + myMenu.pickCaption() + ".";
             M5ez::msgBox(TEXT_SUCCESS, msg, TEXT_OK);
             return;
         }
@@ -423,18 +446,36 @@ void doRead() {
     // save new
     String saveName = M5ez::textInput("Save name?");
     String saveFilePath = String(SAVES_PATH "/");
-    saveFilePath = saveFilePath + amiibo.hash + "/" + saveHash + "_" + saveName + ".bin";
-    FSTools::writeData(saveFilePath.c_str(), tag.data, NTAG215_SIZE);
+    saveFilePath = saveFilePath + amiibo.hash;
+    if (! FSTools::exists(saveFilePath.c_str())) {
+        PRINTV("Making directory: ", saveFilePath);
+        if (! FSTools::mkdirDeep(saveFilePath.c_str())) {
+            PRINTLN("Making directory failed.");
+            M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+            return;
+        }
+    }
+
+    saveFilePath = saveFilePath + "/" + hashes.saveHash + "_" + saveName + ".bin";
+    PRINTV("Saving file to:", saveFilePath);
+    PRINTLN("Data to save:");
+    PRINTHEX(tag.data, NTAG215_SIZE);
+    int writeResult = FSTools::writeData(saveFilePath.c_str(), tag.data, NTAG215_SIZE);
+    if (writeResult < 0) {
+        PRINTV("Write failed:", writeResult);
+        M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+        return;
+    }
     SaveRecord newSave = SaveRecord();
     newSave.amiibo_id = amiibo.id;
-    strcpy(newSave.hash, saveHash);
+    strcpy(newSave.hash, hashes.saveHash);
     strcpy(newSave.name, saveName.c_str());
     strcpy(newSave.file, saveFilePath.c_str());
-    newSave.last_update = now();
     newSave.is_custom = true;
     AmiiboDBAO::insertSave(newSave);
-    String msg("We saved ");
-    msg = msg + amiibo.name + " to " + myMenu.pickButton() + ".";
+    AmiiboDBAO::updateSaveTimestamp(newSave.id);
+    msg = String("We saved ");
+    msg = msg + amiibo.name + " as " + newSave.name + ".";
     M5ez::msgBox(TEXT_SUCCESS, msg, TEXT_OK);
 }
 
@@ -465,7 +506,7 @@ void selectDataSet() {
         FSTools::rename("/sd/amiibos/full/library", LIBRARY_PATH);
         FSTools::rename("/sd/amiibos/full/powersaves", POWER_SAVES_PATH);
         String msg(TMPL_SWITCHED_AMIIBO_SET);
-        msg = msg + TEXT_TEST_AMIIBO_SET;
+        msg = msg + TEXT_FULL_AMIIBO_SET;
         M5ez::msgBox(TEXT_COMPLETE, msg, TEXT_OK);
         return;
     }
@@ -476,7 +517,7 @@ void selectDataSet() {
         FSTools::rename("/sd/amiibos/test/library", LIBRARY_PATH);
         FSTools::rename("/sd/amiibos/test/powersaves", POWER_SAVES_PATH);
         String msg(TMPL_SWITCHED_AMIIBO_SET);
-        msg = msg + TEXT_FULL_AMIIBO_SET;
+        msg = msg + TEXT_TEST_AMIIBO_SET;
         M5ez::msgBox(TEXT_COMPLETE, msg, TEXT_OK);
         return;
     }

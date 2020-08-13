@@ -1,5 +1,5 @@
 
-#define PRINT_DEBUG 1
+#define PRINT_DEBUG 0
 #include <ArduinoDebug.h>
 #include <FSTools.h>
 #include "amiitool.h"

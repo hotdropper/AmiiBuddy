@@ -60,6 +60,27 @@ int NTag215::inList() {
     return 0;
 }
 
+int NTag215::inRelease() {
+    if (_inListed == false) {
+        return 0;
+    }
+
+    _pn532->begin();
+    uint8_t uidLength;
+
+    int success = _pn532->inRelease(1);
+    PRINTV("Got response:", success);
+
+    if (success < 0) {
+        PRINTLNS("We did not find an NFC Card!");
+        return -1;
+    }
+
+    _inListed = false;
+
+    return 0;
+}
+
 int NTag215::writeAmiibo() {
     int inListResult = inList();
 
@@ -221,18 +242,26 @@ bool NTag215::sendCommand(const uint8_t *cmd, uint8_t cmdLength, uint8_t* resp, 
     return true;
 }
 
+int cmdLenBuff = 0;
+uint8_t bytesBuff[300];
+uint8_t respBytesBuff[256];
+uint8_t respBytesLen = 0;
+bool cmdResp;
+int cmdByteCount;
+
 bool NTag215::sendCommandString(const char* command, char* response) {
-    int cmdLen = strlen(command);
-    uint8_t bytes[cmdLen];
-    int cmdByteCount = charToByte(command, strlen(command), bytes, sizeof(bytes));
+    cmdLenBuff = strlen(command);
+    respBytesLen = 255;
+    memset(bytesBuff, 0, 300);
+    memset(respBytesBuff, 0, 256);
 
-    uint8_t respBytes[256];
-    uint8_t respBytesLen = 0;
+    cmdByteCount = charToByte(command, strlen(command), bytesBuff, 300);
 
-    bool cmdResp = sendCommand(bytes, cmdByteCount, respBytes, &respBytesLen);
+
+    cmdResp = sendCommand(bytesBuff, cmdByteCount, respBytesBuff, &respBytesLen);
 
     if (response != nullptr) {
-        byteToChar(respBytes, respBytesLen, response, sizeof(response));
+        byteToChar(respBytesBuff, respBytesLen, response, sizeof(response));
     }
 
     return cmdResp;

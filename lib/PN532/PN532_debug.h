@@ -10,7 +10,7 @@
 #else
     #define PN532_SERIAL Serial
 #endif
-
+//#define PN532_DEBUG
 #ifdef PN532_DEBUG
 #define DMSG(args...)       PN532_SERIAL.print(args)
 #define DMSG_STR(str)       PN532_SERIAL.println(str)

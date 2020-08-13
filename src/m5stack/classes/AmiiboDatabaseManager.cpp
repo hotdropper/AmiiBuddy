@@ -31,34 +31,42 @@ DirectoryDetails adbDirDets = {0, 0};
 int adbFileCount = 0;
 int adbItemCounter = 0;
 md5_hash_t adbHashCache = "";
+File dirBuff;
+int lenBuff;
+AmiiboRecord mgrAmiiboBuff;
+SaveRecord mgrSaveBuff;
+const char* pathBuff;
+String fileNameStrBuff;
+String nameStrBuff;
+String msgBuff;
 
 void fileToAmiiboName(const char* filePath, char* name, size_t nameLen, bool powerSave) {
-    String file(filePath);
-    String nameStr = file.substring(file.lastIndexOf("/") + 1);
-    nameStr = nameStr.substring(0, nameStr.lastIndexOf("."));
-    int dashPos = nameStr.indexOf("-");
+    fileNameStrBuff = String(filePath);
+    nameStrBuff = fileNameStrBuff.substring(fileNameStrBuff.lastIndexOf("/") + 1);
+    nameStrBuff = nameStrBuff.substring(0, nameStrBuff.lastIndexOf("."));
+    int dashPos = nameStrBuff.indexOf("-");
     if (dashPos > -1) {
-        nameStr = nameStr.substring(dashPos + 2);
+        nameStrBuff = nameStrBuff.substring(dashPos + 2);
     }
 
     if (powerSave) {
-        nameStr = nameStr.substring(nameStr.lastIndexOf("[") + 1);
-        nameStr = nameStr.substring(nameStr.lastIndexOf("[") + 1);
-        nameStr = nameStr.substring(0, nameStr.lastIndexOf("]"));
+        nameStrBuff = nameStrBuff.substring(nameStrBuff.lastIndexOf("[") + 1);
+        nameStrBuff = nameStrBuff.substring(nameStrBuff.lastIndexOf("[") + 1);
+        nameStrBuff = nameStrBuff.substring(0, nameStrBuff.lastIndexOf("]"));
     } else {
-        nameStr = nameStr.substring(0, nameStr.indexOf("["));
-        nameStr.trim();
+        nameStrBuff = nameStrBuff.substring(0, nameStrBuff.indexOf("["));
+        nameStrBuff.trim();
     }
 
-    strlcpy(name, nameStr.c_str(), nameLen);
+    strlcpy(name, nameStrBuff.c_str(), nameLen);
 }
 
 bool loadAmiiboFile(const char* path) {
     if (FSTools::readData(path, amiiboData, NTAG215_SIZE) != 0) {
-        String msg(ERROR_LOAD_FILE);
-        msg = msg + path;
-        PRINTLN(msg);
-        M5ez::msgBox(TEXT_WARNING, msg, TEXT_DISMISS);
+        msgBuff = String(ERROR_LOAD_FILE);
+        msgBuff = msgBuff + path;
+        PRINTLN(msgBuff);
+        M5ez::msgBox(TEXT_WARNING, msgBuff, TEXT_DISMISS);
         return false;
     }
 
@@ -67,10 +75,10 @@ bool loadAmiiboFile(const char* path) {
     atool.loadKey(KEY_FILE);
 
     if (! atool.loadFileFromData(amiiboData, NTAG215_SIZE, false)) {
-        String msg(ERROR_INVALID_AMIIBO);
-        msg = msg + path;
-        PRINTLN(msg);
-        M5ez::msgBox(TEXT_WARNING, msg, TEXT_DISMISS);
+        msgBuff = String(ERROR_INVALID_AMIIBO);
+        msgBuff = msgBuff + path;
+        PRINTLN(msgBuff);
+        M5ez::msgBox(TEXT_WARNING, msgBuff, TEXT_DISMISS);
         return false;
     }
 
@@ -142,8 +150,6 @@ void rebuildFileData(const char* library_path) {
     M5ez::yield();
 
     adbItemCounter = 0;
-    File dir;
-    FSTools::open(library_path, &dir);
     M5ez::yield();
 
     auto incrementProgressValue = []() {
@@ -163,35 +169,33 @@ void rebuildFileData(const char* library_path) {
     M5ez::yield();
     PRINTLN("____ START ____");
     printHeapUsage();
-    AmiiboRecord amiibo;
-    SaveRecord save;
 
-    FSTools::traverseFiles(&dir, [&incrementProgressValue, &amiibo, &save](File *entry) -> void {
+    FSTools::traverseFiles(library_path, [&incrementProgressValue](File *entry) -> void {
         PRINTV("Processing file: ", entry->name());
-        const char* path = entry->name();
-        int len = strlen(path);
+        pathBuff = entry->name();
+        lenBuff = strlen(pathBuff);
 
-        if (strcasecmp(path + (len - 4), ".bin") != 0 || strcasecmp(path + (len - 10), "/.ds_store") == 0) {
-            PRINTV("skipping file: ", path);
+        if (strcasecmp(pathBuff + (lenBuff - 4), ".bin") != 0 || strcasecmp(pathBuff + (lenBuff - 10), "/.ds_store") == 0) {
+            PRINTV("skipping file: ", pathBuff);
 
             M5ez::yield();
             return;
         }
 
         printHeapUsage();
-        loadAndProcessAmiiboFile(path, amiibo);
-        AmiiboDBAO::insertAmiibo(amiibo);
+        loadAndProcessAmiiboFile(pathBuff, mgrAmiiboBuff);
+        AmiiboDBAO::insertAmiibo(mgrAmiiboBuff);
 
-        save.amiibo_id = amiibo.id;
+        mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
 //        PRINTV("Save hash:", save.hash);
-        AmiiboDBAO::calculateSaveHash(atool.original, save.hash);
+        AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
 //        PRINTV("Save hash:", save.hash);
-        strcpy(save.file, path);
-        fileToAmiiboName(path, save.name, sizeof(SaveRecord::name), false);
-        save.last_update = now();
-        save.is_custom = false;
+        strcpy(mgrSaveBuff.file, pathBuff);
+        fileToAmiiboName(pathBuff, mgrSaveBuff.name, sizeof(SaveRecord::name), false);
+        mgrSaveBuff.last_update = 0;
+        mgrSaveBuff.is_custom = false;
 
-        AmiiboDBAO::insertSave(save);
+        AmiiboDBAO::insertSave(mgrSaveBuff);
 
         incrementProgressValue();
 
@@ -216,8 +220,6 @@ void rebuildPowerSaveData(const char* power_save_path) {
     PRINTV("Total file count: ", adbFileCount);
 
     adbItemCounter = 0;
-    File dir;
-    FSTools::open(power_save_path, &dir);
     M5ez::yield();
 
     auto incrementProgressValue = []() {
@@ -238,9 +240,8 @@ void rebuildPowerSaveData(const char* power_save_path) {
 
     PRINTLN("____ START ____");
     printHeapUsage();
-    SaveRecord save;
 
-    FSTools::traverseFiles(&dir, [&incrementProgressValue, &save](File *entry) -> void {
+    FSTools::traverseFiles(power_save_path, [&incrementProgressValue](File *entry) -> void {
         if (! loadAmiiboFile(entry->name())) {
             return;
         }
@@ -249,14 +250,14 @@ void rebuildPowerSaveData(const char* power_save_path) {
 
         AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, adbHashCache);
 
-        save.amiibo_id = AmiiboDBAO::findAmiiboIdByHash(adbHashCache);
-        AmiiboDBAO::calculateSaveHash(atool.original, save.hash);
-        fileToAmiiboName(entry->name(), save.name, sizeof(SaveRecord::name), true);
-        strlcpy(save.file, entry->name(), sizeof(SaveRecord::file));
-        save.last_update = now();
-        save.is_custom = false;
+        mgrSaveBuff.amiibo_id = AmiiboDBAO::findAmiiboIdByHash(adbHashCache);
+        AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
+        fileToAmiiboName(entry->name(), mgrSaveBuff.name, sizeof(SaveRecord::name), true);
+        strlcpy(mgrSaveBuff.file, entry->name(), sizeof(SaveRecord::file));
+        mgrSaveBuff.last_update = 0;
+        mgrSaveBuff.is_custom = false;
 
-        AmiiboDBAO::insertSave(save);
+        AmiiboDBAO::insertSave(mgrSaveBuff);
 
         incrementProgressValue();
 
@@ -267,7 +268,86 @@ void rebuildPowerSaveData(const char* power_save_path) {
     printHeapUsage();
 }
 
-bool AmiiboDatabaseManager::initialize(const char* library_path, const char* power_saves_path) {
+void rebuildCustomSaveData(const char* custom_save_path) {
+    readDirectoryDetails("Scanning", "Scanning your Custom Save library...", custom_save_path, &adbDirDets);
+    adbFileCount = adbDirDets.file_count;
+
+    if (pb != nullptr) {
+        free(pb);
+    }
+
+    pb = new ezProgressBar("Processing...", "Processing power saves...");
+
+    PRINTV("Total file count: ", adbFileCount);
+
+    adbItemCounter = 0;
+    M5ez::yield();
+
+    auto incrementProgressValue = []() {
+        adbItemCounter++;
+
+        if (adbItemCounter % 2 != 0) {
+            return;
+        }
+
+        PRINTV("Item counter: ", adbItemCounter);
+        PRINTV("File count: ", adbFileCount);
+        pb->value(((float)adbItemCounter / (float)adbFileCount) * 100);
+        M5ez::redraw();
+        M5ez::yield();
+    };
+
+    M5ez::yield();
+
+    PRINTLN("____ START ____");
+    printHeapUsage();
+
+    FSTools::traverseFiles(custom_save_path, [&incrementProgressValue](File *entry) -> void {
+        if (! loadAmiiboFile(entry->name())) {
+            return;
+        }
+
+        M5ez::yield();
+
+        AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, adbHashCache);
+
+        mgrSaveBuff.amiibo_id = AmiiboDBAO::findAmiiboIdByHash(adbHashCache);
+        AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
+        String saveName = String(entry->name());
+        PRINTV("Save name:", saveName);
+        // strip first /
+        saveName = saveName.substring(saveName.indexOf("/") + 1);
+        PRINTV("Save name:", saveName);
+        // strip sd/
+        saveName = saveName.substring(saveName.indexOf("/") + 1);
+        PRINTV("Save name:", saveName);
+        // strip <amiibo hash>/
+        saveName = saveName.substring(saveName.indexOf("/") + 1);
+        PRINTV("Save name:", saveName);
+        // strip <save hash>_
+        saveName = saveName.substring(saveName.indexOf("_") + 1);
+        PRINTV("Save name:", saveName);
+        // strip .bin
+        saveName = saveName.substring(0, saveName.length() - 4);
+        PRINTV("Save name:", saveName);
+
+        strlcpy(mgrSaveBuff.name, saveName.c_str(), sizeof(SaveRecord::name));
+        strlcpy(mgrSaveBuff.file, entry->name(), sizeof(SaveRecord::file));
+        mgrSaveBuff.last_update = 0;
+        mgrSaveBuff.is_custom = true;
+
+        AmiiboDBAO::insertSave(mgrSaveBuff);
+
+        incrementProgressValue();
+
+        printHeapUsage();
+    });
+
+    PRINTLN("____ END ____");
+    printHeapUsage();
+}
+
+bool AmiiboDatabaseManager::initialize(const char* library_path, const char* power_saves_path, const char* custom_saves_path) {
     if (! AmiiboDBAO::truncate()) {
         return false;
     }
@@ -275,6 +355,8 @@ bool AmiiboDatabaseManager::initialize(const char* library_path, const char* pow
     rebuildFileData(library_path);
 
     rebuildPowerSaveData(power_saves_path);
+
+    rebuildCustomSaveData(custom_saves_path);
 
     ESP.restart();
     return true;

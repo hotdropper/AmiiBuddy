@@ -24,6 +24,7 @@ public:
     bool sendCommand(const uint8_t* cmd, uint8_t cmdLength, uint8_t* resp = nullptr, uint8_t *respLen = nullptr);
     bool authenticate(const uint8_t* password, uint8_t* pack);
     int inList();
+    int inRelease();
 
 protected:
     PN532* _pn532;

@@ -451,6 +451,9 @@ bool PN532::readPassiveTargetID(uint8_t cardbaudrate, uint8_t *uid, uint8_t *uid
 
     if (inlist) {
         inListedTag = pn532_packetbuffer[1];
+        DMSG("Inlisted: ");
+        DMSG(inListedTag);
+        DMSG("\n");
     }
 
     return 1;
@@ -866,8 +869,11 @@ bool PN532::inDataExchange(uint8_t *send, uint8_t sendLength, uint8_t *response,
         return false;
     }
 
-    int16_t status = HAL(readResponse)(response, *responseLength, 1000);
+    int16_t status = HAL(readResponse)(response, *responseLength, 2000);
     if (status < 0) {
+        DMSG("Failed: Got status response: ");
+        DMSG(status);
+        DMSG("\n");
         return false;
     }
 
@@ -919,6 +925,9 @@ bool PN532::inListPassiveTarget()
     }
 
     inListedTag = pn532_packetbuffer[1];
+    DMSG("Inlisted: ");
+    DMSG(inListedTag);
+    DMSG("\n");
 
     return true;
 }

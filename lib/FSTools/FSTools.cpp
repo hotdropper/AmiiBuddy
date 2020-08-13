@@ -2,6 +2,8 @@
 // Created by Jacob Mather on 7/31/20.
 //
 
+#define PRINT_DEBUG 1
+#include <ArduinoDebug.h>
 #include "FSTools.h"
 #include <string>
 
@@ -32,48 +34,58 @@ FS* FSTools::fsBuffer2 = nullptr;
 void FSTools::init() {
 }
 
-void FSTools::traverseEntries(std::list<File>* dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const std::function <void (File*)>& callback) {
-    if (dirs->empty()) {
+void FSTools::traverseEntries(FS* fs, std::list<String>& dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const std::function <void (File*)>& callback) {
+    if (dirs.empty()) {
         return;
     }
 
+    File dir;
     File entry;
-    for (auto dir : *dirs) {
+    for (const auto& dirPath : dirs) {
+        PRINTV("Scanning:", dirPath);
+        dir = fs->open(dirPath, FILE_READ);
         while ((entry = dir.openNextFile(FILE_READ))) {
             if (entry.isDirectory()) {
                 if (recursive) {
-                    dirs->push_back(entry);
+                    const auto dirEntry = String(entry.name());
+                    dirs.push_back(dirEntry);
                 }
 
                 if (callOnDir) {
                     callback(&entry);
                 }
+                entry.close();
                 continue;
             }
 
             if (callOnFile) {
                 callback(&entry);
+                entry.close();
             }
         }
+        dir.close();
     }
 }
 
-void FSTools::traverseDirs(File* dir, const std::function <void (File*)>& callback) {
-    std::list<File> dirs;
-    dirs.push_front(*dir);
-    return traverseEntries(&dirs, true, false, true, callback);
+void FSTools::traverseDirs(const char* dir, const std::function <void (File*)>& callback, FS* fs) {
+    std::list<String> dirs;
+    String dirPath = String(dir);
+    dirs.push_front(dirPath);
+    return traverseEntries(fs, dirs, true, false, true, callback);
 }
 
-void FSTools::traverseEntries(File* dir, const bool recursive, const std::function <void (File*)>& callback) {
-    std::list<File> dirs;
-    dirs.push_front(*dir);
-    return traverseEntries(&dirs, recursive, true, true, callback);
+void FSTools::traverseEntries(const char* dir, const bool recursive, const std::function <void (File*)>& callback, FS* fs) {
+    std::list<String> dirs;
+    String dirPath = String(dir);
+    dirs.push_front(dirPath);
+    return traverseEntries(fs, dirs, recursive, true, true, callback);
 }
 
-void FSTools::traverseFiles(File* dir, const std::function <void (File*)>& callback) {
-    std::list<File> dirs;
-    dirs.push_front(*dir);
-    return traverseEntries(&dirs, true, true, false, callback);
+void FSTools::traverseFiles(const char* dir, const std::function <void (File*)>& callback, FS* fs) {
+    std::list<String> dirs;
+    String dirPath = String(dir);
+    dirs.push_front(dirPath);
+    return traverseEntries(fs, dirs, true, true, false, callback);
 }
 
 void FSTools::forEachDir(const char* path, const std::function <void (const char*)>& callback, FS* fs) {
@@ -99,12 +111,16 @@ void FSTools::forEachDir(const char* path, const std::function <void (const char
     callback(path);
 }
 
-void FSTools::mkdirDeep(const char* path, FS* fs) {
-    forEachDir(path, [&fs](const char* pathFragment) {
+bool FSTools::mkdirDeep(const char* path, FS* fs) {
+    bool ret = true;
+    forEachDir(path, [&fs, &ret](const char* pathFragment) {
         if (! fs->exists(pathFragment)) {
-            fs->mkdir(pathFragment);
+            if (ret == false || ! fs->mkdir(pathFragment)) {
+                ret = false;
+            }
         }
     }, fs);
+    return ret;
 }
 
 void FSTools::openForWrite(const char* path, File* file, FS* fs) {
@@ -131,9 +147,9 @@ void FSTools::open(const char* path, File* file, FS* fs) {
     *file = fs->open(path);
 }
 
-void FSTools::remove(const char* path, FS* fs) {
+bool FSTools::remove(const char* path, FS* fs) {
     if (! fs->exists(path)) {
-        fs->remove(path);
+        return fs->remove(path);
     }
 }
 
@@ -155,22 +171,30 @@ int FSTools::readData(const char *path, uint8_t *data, int dataLength, FS* fs) {
 
 int FSTools::writeData(const char *path, const uint8_t *data, int dataLength, FS* fs) {
     String rootPath(path);
-    rootPath.substring(0, rootPath.lastIndexOf("/"));
-    mkdirDeep(rootPath.c_str(), fs);
+    rootPath = rootPath.substring(0, rootPath.lastIndexOf("/"));
+    PRINTV("Ensuring directory exists:", rootPath);
+    if (! exists(rootPath.c_str(), fs) && ! mkdirDeep(rootPath.c_str(), fs)) {
+        PRINTLN("Making the directory failed");
+        return -3;
+    }
 
     File f = fs->open(path, FILE_WRITE);
     if (!f) {
         return -1;
     }
 
-    if (!f.write(data, dataLength)) {
+    PRINTV("File", path);
+    PRINTV("Length", dataLength);
+    int writeResponse = f.write(data, dataLength);
+    PRINTV("Write response", writeResponse);
+    if (writeResponse != dataLength) {
         f.close();
-        return -2;
+        return writeResponse;
     }
 
     f.close();
 
-    return 0;
+    return writeResponse;
 }
 
 int FSTools::readDirectoryDetails(const char* path, DirectoryDetails& details, FS* fs, const std::function <void (File*)>& callback) {
@@ -181,8 +205,7 @@ int FSTools::readDirectoryDetails(const char* path, DirectoryDetails& details, F
     details.file_count = 0;
     details.dir_count = 0;
 
-    File dir = fs->open(path);
-    traverseEntries(&dir, true, [&details, &callback](File* entry) {
+    traverseEntries(path, true, [&details, &callback](File* entry) {
         if (entry->isDirectory()) {
             details.dir_count++;
         } else {
@@ -192,7 +215,7 @@ int FSTools::readDirectoryDetails(const char* path, DirectoryDetails& details, F
         if (callback != nullptr) {
             callback(entry);
         }
-    });
+    }, fs);
 
     return details.file_count + details.dir_count;
 }
@@ -203,12 +226,11 @@ int FSTools::getFileCount(const char *path, FS* fs) {
         return -1;
     }
 
-    File dir = fs->open(path);
     int fileCount = 0;
 
-    traverseFiles(&dir, [&fileCount](File *entry) -> void {
+    traverseFiles(path, [&fileCount](File *entry) -> void {
         fileCount++;
-    });
+    }, fs);
 
     return fileCount;
 }

@@ -40,6 +40,7 @@ const prog_char PROGMEM MSG_WAITING_FOR_DB_RELOAD[] = "Waiting for the db to rel
 
 const prog_char PROGMEM TEXT_WAITING[] = "Waiting";
 const prog_char PROGMEM TEXT_WARNING[] = "Warning";
+const prog_char PROGMEM TEXT_ERROR[] = "Error";
 const prog_char PROGMEM TEXT_DISMISS[] = "Dismiss";
 const prog_char PROGMEM TEXT_OK[] = "Ok";
 const prog_char PROGMEM TEXT_SUCCESS[] = "Success";
