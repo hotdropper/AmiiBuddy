@@ -10,7 +10,6 @@
 #include <list>
 #include <M5ez.h>
 #include <MD5Builder.h>
-#include "AmiiBuddy.h"
 #include <FSTools.h>
 #include "../utils.h"
 #include <sqlite3.h>
@@ -357,7 +356,7 @@ void rebuildCustomSaveData(const char* custom_save_path) {
     printHeapUsage();
 }
 
-bool AmiiboDatabaseManager::initialize(const char* library_path, const char* power_saves_path, const char* custom_saves_path) {
+bool AmiiboDatabaseManager::reinitialize(const char* library_path, const char* power_saves_path, const char* custom_saves_path) {
     if (! AmiiboDBAO::truncate()) {
         return false;
     }

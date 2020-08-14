@@ -55,16 +55,6 @@ int byteToChar(const uint8_t *src, size_t srcLen, char *dest, size_t destLen) {
     return strlen(dest);
 }
 
-void printAmiiboKeysValidation(const char *prefix, const nfc3d_amiibo_keys *keys) {
-    PRINT(prefix);
-    PRINT("data.magicByteSize: ");
-    PRINTLN(keys->data.magicBytesSize);
-    PRINT(prefix);
-    PRINT("tag.magicBytesSize: ");
-    PRINTLN(keys->tag.magicBytesSize);
-    PRINTLN("");
-}
-
 void processRawAmiiboKeyData(const uint8_t *amiiboKeyRawData, nfc3d_amiibo_keys *keys) {
     int offset = 0;
     for (int i = 0; i < 16; i++) {
@@ -160,52 +150,4 @@ void printHeapUsage() {
 //    PRINTV("Free heap: ", ESP.getFreeHeap());
 //    PRINTV("Total PSRAM: ", ESP.getPsramSize());
 //    PRINTV("Free PSRAM: ", ESP.getFreePsram());
-}
-
-//ProgressCallback displayUnboundProgressBar(const String& title, const String& text, const ProgressCallback* callback, const size_t break_point) {
-//    ezProgressBar pb(title, text);
-//    ProgressCallback iterate = [&pb](float value) {
-//        pb.value(value);
-//        M5ez::redraw();
-//        M5ez::yield();
-//    };
-//
-//    ProgressCallback progress = unboundedIterator(break_point, (const ProgressCallback*) &iterate);
-//}
-//
-//ProgressCallback unboundIterator(const ProgressCallback* callback, const size_t break_point) {
-//    size_t counter = 0;
-//
-//    ProgressCallback cb;
-//    if (callback != nullptr) {
-//        cb = *callback;
-//    }
-//
-//    auto progress = [&break_point, &counter, &cb]() {
-//        counter++;
-//        if (counter % 10 != 0) {
-//            return;
-//        }
-//
-//        float value = (float)counter / (float)break_point * 100;
-//
-//        if (counter >= break_point) {
-//            counter = 0;
-//        }
-//
-//        cb(value);
-//    };
-//
-//    return progress;
-//}
-
-String fileToAmiiboName(const String& filePath) {
-    String name = filePath.substring(filePath.lastIndexOf("/") + 1);
-    name = name.substring(0, name.lastIndexOf("."));
-    int dashPos = name.indexOf("-");
-    if (dashPos > -1) {
-        name = name.substring(dashPos + 2);
-    }
-
-    return name;
 }

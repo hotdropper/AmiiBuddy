@@ -8,6 +8,8 @@
 #include <amiitool.h>
 
 
+const prog_char PROGMEM KEY_FILE[] = "/sd/keys/retail.bin";
+
 const prog_char PROGMEM FIELD_NAME[] = "name";
 const prog_char PROGMEM FIELD_OWNER_NAME[] = "owner_name";
 const prog_char PROGMEM FIELD_CHARACTER_NUMBER[] = "character_number";

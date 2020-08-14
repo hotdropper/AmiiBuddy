@@ -101,7 +101,7 @@ int db_exec(sqlite3 *db, const char *sql) {
     return rc;
 }
 
-bool AmiiboDBAO::begin() {
+bool AmiiboDBAO::initialize() {
     sqlite3_initialize();
 
     if (openDb(SQLITE_DB_PATH, &dbh)) {

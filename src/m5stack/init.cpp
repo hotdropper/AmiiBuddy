@@ -9,10 +9,12 @@
 #include <PN532_I2C.h>
 #include <SD.h>
 #include <FSTools.h>
+#include <AmiiboDBAO.h>
+#include "../amiibuddy_constants.h"
 #include "firmware.h"
-#include "classes/BatteryMonitor.h"
+#include "classes/AmiiboDatabaseManager.h"
+#include "../../lib/M5ezBatteryMonitor/M5ezBatteryMonitor.h"
 #include "classes/NFCMonitor.h"
-#include "classes/AmiiBuddy.h"
 
 PN532_I2C pn532i2c(Wire);
 TrackablePN532Interface trackablePN532(pn532i2c);
@@ -62,15 +64,21 @@ bool initSD() {
     return sdStarted;
 }
 
-void showInit() {
-    amiiboDatabase.begin();
+void initializeDatabase() {
+    AmiiboDatabaseManager::reinitialize();
+}
 
-    amiiBuddy.begin(&SD, &pn532, &amiiboDatabase);
+void showInit() {
+    if (! AmiiboDBAO::initialize()) {
+        M5ez::msgBox(TEXT_WARNING, "Could not initialize the database.", TEXT_DISMISS);
+    } else {
+        ezSettings::menuObj.addItem("Re-initialize database", initializeDatabase);
+    }
 
     nfcMonitor.begin(&pn532, &SD, &M5.Lcd);
-    BatteryMonitor::begin();
+    M5ezBatteryMonitor::begin();
 
-    if (! amiiBuddy.loadKey()) {
+    if (! atool.loadKey(KEY_FILE)) {
         M5ez::msgBox("amiiBuddy - Error", "The key in /keys/retail.bin is invalid.");
     }
 

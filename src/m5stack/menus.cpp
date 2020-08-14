@@ -14,8 +14,7 @@
 #include "firmware.h"
 #include "FSTools.h"
 #include "utils.h"
-#include "classes/AmiiboDatabase.h"
-#include "classes/AmiiBuddy.h"
+#include "classes/AmiiboDatabaseManager.h"
 #include "classes/NFCMonitor.h"
 #include "classes/MagicNTag215.h"
 

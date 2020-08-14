@@ -37,7 +37,7 @@ struct DirectoryComparator
 
 class AmiiboDatabaseManager {
 public:
-    static bool initialize(const char* library_path = LIBRARY_PATH, const char* power_saves_path = POWER_SAVES_PATH, const char* custom_saves_path = SAVES_PATH);
+    static bool reinitialize(const char* library_path = LIBRARY_PATH, const char* power_saves_path = POWER_SAVES_PATH, const char* custom_saves_path = SAVES_PATH);
 };
 
 #endif //AMIIBUDDY_AMIIBODATABASEMANAGER_H

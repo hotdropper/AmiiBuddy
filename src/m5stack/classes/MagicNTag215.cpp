@@ -4,10 +4,11 @@
 
 #define PRINT_DEBUG 1
 #include <ArduinoDebug.h>
+#include <M5ez.h>
 #include <AmiiboDBAO.h>
 #include "MagicNTag215.h"
 #include "AmiiboDatabaseManager.h"
-#include "m5stack/utils.h"
+#include "../utils.h"
 #define ENFORCE_INLIST() { int ilr = inList(); if (ilr != 0) return ilr; }
 
 #define CONFIG_EMPTY_TEMPLATE "A2%02hhX00000000"

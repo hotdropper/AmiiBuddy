@@ -1,4 +1,0 @@
-test_data/Isabelle.bin
-test_data/Kiki.bin
-test_data/Isabelle-MonsterHunter.bin
-test_data/Isabelle-VideoGame.bin
