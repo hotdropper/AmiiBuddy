@@ -11,6 +11,8 @@
 void setup() {
     M5ez::begin();
     M5.Power.begin();
+    Serial.print("AmiiBuddy Version ");
+    Serial.println(AMIIBUDDY_VERSION);
     initPN532();
     initSD();
 

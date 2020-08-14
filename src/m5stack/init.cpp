@@ -83,7 +83,7 @@ void showInit() {
     }
 
     if (hasFirmwareUpdate()) {
-        ezSettings::menuObj.addItem("Update firmware", updateFirmware);
+        ezSettings::menuObj.addItem("Update firmware", firmwareMenu);
     }
 }
 
