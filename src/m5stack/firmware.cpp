@@ -49,7 +49,7 @@ bool getDownloadUrl(char* s3Url, int s3UrlLength) {
         String msg("There is an update available!\n\nUpdate to ");
         msg += doc["tag_name"].as<String>() + "?";
 
-        if (M5ez::msgBox("Firmware Update", msg, "Update|Cancel") == "Cancel") {
+        if (M5ez::msgBox("Firmware Update", msg, "Cancel##Update") == "Cancel") {
             return false;
         }
 
