@@ -2,14 +2,14 @@
 // Created by hotdropper on 7/20/20.
 //
 
-#ifndef AMIIBUDDY_MAGICNTAG215_H
-#define AMIIBUDDY_MAGICNTAG215_H
+#ifndef AMIIBUDDY_NTAG215MAGIC_H
+#define AMIIBUDDY_NTAG215MAGIC_H
 
 #include "NTag215.h"
 
-class MagicNTag215 : public NTag215 {
+class NTag215Magic : public NTag215 {
 public:
-    explicit MagicNTag215(PN532* adapter = &pn532);
+    explicit NTag215Magic(PN532* adapter = &pn532);
 
     int reset(const char* newUid);
     int reset();
@@ -24,4 +24,4 @@ private:
 };
 
 
-#endif //AMIIBUDDY_MAGICNTAG215_H
+#endif //AMIIBUDDY_NTAG215MAGIC_H

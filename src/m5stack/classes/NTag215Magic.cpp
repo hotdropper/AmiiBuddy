@@ -6,7 +6,7 @@
 #include <ArduinoDebug.h>
 #include <M5ez.h>
 #include <AmiiboDBAO.h>
-#include "MagicNTag215.h"
+#include "NTag215Magic.h"
 #include "AmiiboDatabaseManager.h"
 #include "../utils.h"
 #define ENFORCE_INLIST() { int ilr = inList(); if (ilr != 0) return ilr; }
@@ -15,11 +15,12 @@
 #define CONFIG_1_TEMPLATE "A2%02hhX000000FF"
 #define CONFIG_2_TEMPLATE "A2%02hhX00050000"
 
-MagicNTag215::MagicNTag215(PN532 *adapter) : NTag215(adapter) {
+NTag215Magic::NTag215Magic(PN532 *adapter) : NTag215(adapter) {
     NTag215::setUid("04912FD2D56480");
 }
 
-int MagicNTag215::writeAmiibo() {
+int NTag215Magic::writeAmiibo() {
+    PRINTLN("Writing from NTag215Magic");
     PRINTLN("Fixing funky bits...");
 
     int base = 2 * NTAG215_PAGESIZE;
@@ -77,7 +78,7 @@ int MagicNTag215::writeAmiibo() {
     return 0;
 }
 
-bool MagicNTag215::setUid(const char *newUid) {
+bool NTag215Magic::setUid(const char *newUid) {
     uint8_t bytes[strlen(newUid)];
     charToByte(newUid, strlen(newUid), bytes, sizeof(bytes));
 
@@ -101,7 +102,7 @@ bool MagicNTag215::setUid(const char *newUid) {
     return true;
 }
 
-bool MagicNTag215::setVersion(const char* version) {
+bool NTag215Magic::setVersion(const char* version) {
     uint8_t bytes[strlen(version)];
     charToByte(version, strlen(version), bytes, sizeof(bytes));
 
@@ -119,7 +120,7 @@ bool MagicNTag215::setVersion(const char* version) {
     return true;
 }
 
-bool MagicNTag215::setSignature(const char* signature) {
+bool NTag215Magic::setSignature(const char* signature) {
     int sigLen = strlen(signature);
     uint8_t bytes[sigLen];
     charToByte(signature, strlen(signature), bytes, sizeof(bytes));
@@ -142,7 +143,7 @@ bool MagicNTag215::setSignature(const char* signature) {
     return true;
 }
 
-bool MagicNTag215::setPassword(const char* password) {
+bool NTag215Magic::setPassword(const char* password) {
     int passLen = strlen(password);
     uint8_t bytes[passLen];
     charToByte(password, strlen(password), bytes, sizeof(bytes));
@@ -152,7 +153,7 @@ bool MagicNTag215::setPassword(const char* password) {
     return sendCommand(cmd, 6);
 }
 
-bool MagicNTag215::setPack(const char* pack) {
+bool NTag215Magic::setPack(const char* pack) {
     int packLen = strlen(pack);
     uint8_t bytes[packLen];
     charToByte(pack, strlen(pack), bytes, sizeof(bytes));
@@ -168,7 +169,7 @@ char tmpl[sizeof(CONFIG_EMPTY_TEMPLATE)];
 char cmdStrBuffer[50];
 uint8_t cmdBuffer[50];
 
-bool MagicNTag215::wipe() {
+bool NTag215Magic::wipe() {
     for (int b = 3; b <= 0xFB; b++) {
         if (b == 0x29 || b == 0x83 || b == 0xe3) {
             strcpy(tmpl, CONFIG_1_TEMPLATE);
@@ -191,7 +192,7 @@ bool MagicNTag215::wipe() {
     return true;
 }
 
-int MagicNTag215::reset(const char* newUid) {
+int NTag215Magic::reset(const char* newUid) {
     PRINTV("Resetting to UID:", newUid);
 
     uint8_t newUidBytes[strlen(newUid)];
@@ -240,6 +241,6 @@ int MagicNTag215::reset(const char* newUid) {
     return true;
 }
 
-int MagicNTag215::reset() {
+int NTag215Magic::reset() {
     return reset((const char*)tagUid);
 }

@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 
-#define AMIIBUDDY_VERSION "v0.2.1"
+#define AMIIBUDDY_VERSION "v0.2.2"
 #define FIRMWARE_FILE "/firmware.bin"
 
 const prog_char PROGMEM BALTIMORE_ROOT_CERT[] = \

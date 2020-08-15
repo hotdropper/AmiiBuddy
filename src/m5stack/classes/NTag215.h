@@ -14,11 +14,9 @@ public:
     char uidStr[15] = "";
     uint8_t data[NTAG215_SIZE] = { 0 };
 
-    explicit NTag215(PN532* adapter = &pn532);
-
     void setPN532(PN532* adapter);
     virtual bool setUid(const char *newUid);
-    virtual int writeAmiibo();
+    virtual int writeAmiibo() = 0;
     int readAmiibo();
     bool sendCommandString(const char* command, char* response = nullptr);
     bool sendCommand(const uint8_t* cmd, uint8_t cmdLength, uint8_t* resp = nullptr, uint8_t *respLen = nullptr);
@@ -27,6 +25,7 @@ public:
     int inRelease();
 
 protected:
+    explicit NTag215(PN532* adapter = &pn532);
     PN532* _pn532;
     bool _inListed = false;
     uint8_t bcc(uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4);

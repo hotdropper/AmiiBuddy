@@ -10,6 +10,7 @@
 #include <SD.h>
 #include <FSTools.h>
 #include <AmiiboDBAO.h>
+#include <Preferences.h>
 #include "../amiibuddy_constants.h"
 #include "firmware.h"
 #include "classes/AmiiboDatabaseManager.h"
@@ -20,6 +21,7 @@ PN532_I2C pn532i2c(Wire);
 TrackablePN532Interface trackablePN532(pn532i2c);
 PN532 pn532(trackablePN532);
 bool PN532_PRESENT = false;
+TargetTagType TARGET_TAG_TYPE = TARGET_MAGIC_NTAG_215;
 
 bool foundPN532() {
     return PN532_PRESENT;
@@ -85,6 +87,11 @@ void showInit() {
     if (hasFirmwareUpdate()) {
         ezSettings::menuObj.addItem("Update firmware", firmwareMenu);
     }
+
+    Preferences prefs;
+    prefs.begin("amiiBuddy", true);	// read-only
+    TARGET_TAG_TYPE = (TargetTagType) prefs.getInt("target_tag_type", TARGET_MAGIC_NTAG_215);
+    prefs.end();
 }
 
 void runInit() {

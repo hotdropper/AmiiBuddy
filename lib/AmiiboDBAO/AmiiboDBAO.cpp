@@ -420,7 +420,7 @@ int AmiiboDBAO::findAmiiboIdByHash(const char* hash) {
 }
 
 bool AmiiboDBAO::findAmiiboById(const int id, AmiiboRecord& amiibo) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, &res, tail)) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_ID, &res, tail)) {
         return false;
     }
 

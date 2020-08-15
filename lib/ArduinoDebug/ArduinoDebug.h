@@ -11,7 +11,7 @@
 #define PRINT_DEBUG 0
 #endif
 
-#if PRINT_DEBUG
+#if PRINT_DEBUG && !defined(AMIIBUDDY_RELEASE)
 #define PRINT_PREAMBLE() { Serial.print(__FILE__); Serial.print(F(":")); Serial.print(__LINE__); Serial.print(F(" ")); Serial.print(__FUNCTION__); Serial.print(F("(): ")); }
 #define PRINT(...)   { Serial.print(__VA_ARGS__); }
 #define PRINTLN(...)   { PRINT_PREAMBLE(); Serial.println(__VA_ARGS__); }

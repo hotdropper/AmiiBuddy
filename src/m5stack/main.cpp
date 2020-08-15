@@ -1,4 +1,5 @@
 //#define USE_SDFAT
+#define PRINT_DEBUG 1
 #include <ArduinoDebug.h>
 #include <M5ez.h>
 
@@ -11,8 +12,7 @@
 void setup() {
     M5ez::begin();
     M5.Power.begin();
-    Serial.print("AmiiBuddy Version ");
-    Serial.println(AMIIBUDDY_VERSION);
+    PRINTV("AmiiBuddy Version ", AMIIBUDDY_VERSION);
     initPN532();
     initSD();
 

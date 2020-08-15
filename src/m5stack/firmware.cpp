@@ -11,6 +11,7 @@
 #include <ArduinoJson.h>
 
 #include <M5StackUpdater.h>
+#define PRINT_DEBUG 0
 #include <ArduinoDebug.h>
 #include "../amiibuddy_constants.h"
 
@@ -34,10 +35,9 @@ bool getDownloadUrl(char* s3Url, int s3UrlLength) {
     int httpResponseCode = http.GET();
 
     if (httpResponseCode > 0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
+        PRINTV("HTTP Response code: ", httpResponseCode);
         String payload = http.getString();
-        Serial.println(payload);
+        PRINTLN(payload);
         DynamicJsonDocument doc(payload.length());
         deserializeJson(doc, payload);
 
@@ -70,8 +70,7 @@ bool getDownloadUrl(char* s3Url, int s3UrlLength) {
 
         http.end();
         http.setReuse(false);
-        Serial.print("Asset Download URL: ");
-        Serial.println(downloadUrl);
+        PRINTV("Asset Download URL: ", downloadUrl);
 
         const char* STATUS_HEADER = "status";
         const char* LOCATION_HEADER = "location";
@@ -84,21 +83,17 @@ bool getDownloadUrl(char* s3Url, int s3UrlLength) {
 
         int response2 = http.GET();
 
-        Serial.print("Response: ");
-        Serial.println(response2);
-        Serial.print("Status: ");
-        Serial.println(http.header("status"));
+        PRINTV("Response: ", response2);
+        PRINTV("Status: ", http.header("status"));
 
         for (int i = 0; i < http.headers(); i++) {
-            Serial.print(http.headerName(i));
-            Serial.print(": ");
-            Serial.println(http.header(i));
+            PRINTV("Header name:", http.headerName(i));
+            PRINTV("Header value:", http.header(i));
         }
 
         if (http.header("status") == "302 Found") {
             strncpy(s3Url, http.header("location").c_str(), s3UrlLength);
-            Serial.print("Download url: ");
-            Serial.println(s3Url);
+            PRINTV("Download url: ", s3Url);
             foundUrl = true;
         }
 

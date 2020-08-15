@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <AmiiboDBAO.h>
+#include <Preferences.h>
 #include "menus.h"
 #include "init.h"
 #include "firmware.h"
@@ -16,12 +17,60 @@
 #include "utils.h"
 #include "classes/AmiiboDatabaseManager.h"
 #include "classes/NFCMonitor.h"
-#include "classes/MagicNTag215.h"
+#include "classes/NTag215Magic.h"
+#include "classes/NTag215Generic.h"
 
 bool goHome = false;
 char adjustedPath[200] = "";
 char lastPath[200] = LIBRARY_PATH;
 AmiiboRecord menuAmiiboBuff;
+
+void selectTargetTagType() {
+    ezMenu myMenu("NFC Target");
+    myMenu.txtSmall();
+    myMenu.buttons("up#Back#select##down#");
+
+    switch(TARGET_TAG_TYPE) {
+        case TARGET_MAGIC_NTAG_215:
+            myMenu.addItem("MagicNTag215|Magic NTag 21x (current)");
+            myMenu.addItem("NTag215|NTag 215");
+            myMenu.addItem("PuckJS|Puck.JS");
+            break;
+        case TARGET_NTAG_215:
+            myMenu.addItem("MagicNTag215|Magic NTag 21x");
+            myMenu.addItem("NTag215|NTag 215 (current)");
+            myMenu.addItem("PuckJS|Puck.JS");
+            break;
+        case TARGET_PUCK_JS:
+            myMenu.addItem("MagicNTag215|Magic NTag 21x");
+            myMenu.addItem("NTag215|NTag 215");
+            myMenu.addItem("PuckJS|Puck.JS (current)");
+            break;
+        default:
+            myMenu.addItem("MagicNTag215|Magic NTag 21x (current)");
+            myMenu.addItem("NTag215|NTag 215");
+            myMenu.addItem("PuckJS|Puck.JS");
+    }
+
+    myMenu.runOnce();
+
+    if (myMenu.pickButton() == "Back") {
+        return;
+    }
+
+    if (myMenu.pickName() == "MagicNTag215") {
+        TARGET_TAG_TYPE = TARGET_MAGIC_NTAG_215;
+    } else if (myMenu.pickName() == "NTag215") {
+        TARGET_TAG_TYPE = TARGET_NTAG_215;
+    } else if (myMenu.pickName() == "PuckJS") {
+        TARGET_TAG_TYPE = TARGET_PUCK_JS;
+    }
+
+    Preferences prefs;
+    prefs.begin("amiiBuddy", false);	// read-only
+    prefs.putInt("target_tag_type", TARGET_TAG_TYPE);
+    prefs.end();
+}
 
 void selectFile(const char* filename) {
     if (! PN532_PRESENT) {
@@ -30,10 +79,22 @@ void selectFile(const char* filename) {
     }
     M5ez::yield();
 
-    MagicNTag215 tag;
-    FSTools::readData(filename, tag.data, NTAG215_SIZE);
+    NTag215* tag;
+    switch (TARGET_TAG_TYPE) {
+        case TARGET_MAGIC_NTAG_215:
+            tag =  new NTag215Magic();
+            break;
+        case TARGET_NTAG_215:
+            tag = new NTag215Generic();
+            break;
+        default:
+            M5ez::msgBox(TEXT_WARNING, "Puck.JS target is not currently supported.", TEXT_OK);
+            return;
+    }
+
+    FSTools::readData(filename, tag->data, NTAG215_SIZE);
     HashInfo hashes;
-    AmiiboDBAO::calculateHashes(tag.data, hashes);
+    AmiiboDBAO::calculateHashes(tag->data, hashes);
     AmiiboDBAO::findAmiiboByHash(hashes.amiiboHash, menuAmiiboBuff);
 
     ezMenu myMenu("Select save?");
@@ -89,19 +150,28 @@ void selectFile(const char* filename) {
 
     PRINTV("File to load:", fileToLoad);
 
-    int readResp = FSTools::readData(fileToLoad.c_str(), tag.data, NTAG215_SIZE);
+    int readResp = FSTools::readData(fileToLoad.c_str(), tag->data, NTAG215_SIZE);
     if (readResp < 0) {
         PRINTV("Got read result:", readResp);
         M5ez::msgBox(TEXT_ERROR, "We were unable to read the file.", TEXT_OK);
         return;
     }
 
-    atool.loadKey(KEY_FILE);
-    atool.loadFileFromData(tag.data, NTAG215_SIZE, false);
-    atool.encryptLoadedFile(tag.uid);
-    memcpy(tag.data, atool.original, NTAG215_SIZE);
+    if (TARGET_TAG_TYPE == TARGET_NTAG_215) {
+        if (tag->inList() != 0) {
+            M5ez::msgBox(TEXT_ERROR, "Could not find a tag to write to!", TEXT_OK);
+            return;
+        }
+    }
 
-    int burn = nfcMonitor.monitorAmiiboWrite(pb, &tag);
+    atool.loadKey(KEY_FILE);
+    atool.loadFileFromData(tag->data, NTAG215_SIZE, false);
+    atool.encryptLoadedFile(tag->uid);
+    memcpy(tag->data, atool.original, NTAG215_SIZE);
+
+    int burn = nfcMonitor.monitorAmiiboWrite(pb, tag);
+
+    free(tag);
 
     PRINT("Got burn result: ");
     PRINTLN(burn);
@@ -288,7 +358,7 @@ void showPN532Diagnostic() {
 }
 
 void showNfcDiagnostic() {
-    NTag215 tag(&pn532);
+    NTag215Generic tag(&pn532);
 
     int inListRes = tag.inList();
 
@@ -306,7 +376,7 @@ void showNfcDiagnostic() {
 }
 
 void doWipe() {
-    MagicNTag215 tag(&pn532);
+    NTag215Magic tag(&pn532);
     tag.reset();
     M5ez::msgBox("AmiiBuddy - Wipe", "Wiped");
 }
@@ -325,8 +395,20 @@ void showDiagnostic() {
 void doRead() {
     auto pb = new ezProgressBar("Reading...", "Reading amiibo to tag...");
 
-    NTag215 tag;
-    int readResult = nfcMonitor.monitorAmiiboRead(pb, &tag);
+    NTag215* tag;
+    switch (TARGET_TAG_TYPE) {
+        case TARGET_MAGIC_NTAG_215:
+            tag =  new NTag215Magic();
+            break;
+        case TARGET_NTAG_215:
+            tag = new NTag215Generic();
+            break;
+        default:
+            M5ez::msgBox(TEXT_WARNING, "Puck.JS target is not currently supported.", TEXT_OK);
+            return;
+    }
+
+    int readResult = nfcMonitor.monitorAmiiboRead(pb, tag);
 
     String btn;
 
@@ -341,20 +423,22 @@ void doRead() {
             return;
         case -3:
             btn = M5ez::msgBox("Error", "We had trouble reading the tag. Try again?", "Cancel##Ok");
+            free(tag);
             if (btn == "Ok") {
                 return doRead();
             }
             return;
         default:
             M5ez::msgBox("Error", "Unknown error occurred.");
+            free(tag);
             return;
     }
 
     PRINTLN("Read Tag Data");
-    PRINTHEX(tag.data, NTAG215_SIZE);
+    PRINTHEX(tag->data, NTAG215_SIZE);
 
     HashInfo hashes;
-    AmiiboDBAO::calculateHashes(tag.data, hashes);
+    AmiiboDBAO::calculateHashes(tag->data, hashes);
     M5ez::yield();
     printAmiibo(atool.amiiboInfo);
     PRINTV("Amiibo Hash: ", hashes.amiiboHash);
@@ -383,9 +467,11 @@ void doRead() {
 
     if (! foundAmiibo) {
         M5ez::msgBox("Error", "This does not seem to be an Amiibo we recognize.");
+        free(tag);
         return;
     } else if (saveLookupResult < 1) {
         M5ez::msgBox("Error", "We must have misread the tag. Please try again.");
+        free(tag);
         return;
     }
 
@@ -393,6 +479,7 @@ void doRead() {
         String msg("We would recognize ");
         msg = msg + amiibo.name + " anywhere!\nWe found no changes.";
         M5ez::msgBox(TEXT_SUCCESS, msg, TEXT_OK);
+        free(tag);
         return;
     }
 
@@ -403,6 +490,7 @@ void doRead() {
     String button = M5ez::msgBox("Success", msg, "Cancel##Save");
 
     if (button == "Cancel") {
+        free(tag);
         return;
     }
 
@@ -414,6 +502,7 @@ void doRead() {
         PRINTV("Selected item button:", myMenu.pickButton());
 
         if (myMenu.pickButton() == "Cancel") {
+            free(tag);
             return;
         }
         if (myMenu.pickButton() == "Select") {
@@ -423,11 +512,13 @@ void doRead() {
             if (! FSTools::remove(saveFile.c_str())) {
                 PRINTLN("Could not remove old file.");
                 M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+                free(tag);
                 return;
             }
 
-            if (FSTools::writeData(saveFile.c_str(), tag.data, NTAG215_SIZE) != NTAG215_SIZE) {
+            if (FSTools::writeData(saveFile.c_str(), tag->data, NTAG215_SIZE) != NTAG215_SIZE) {
                 M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+                free(tag);
                 return;
             }
             SaveRecord save;
@@ -438,6 +529,7 @@ void doRead() {
             msg = String("We saved ");
             msg = msg + amiibo.name + " as " + myMenu.pickCaption() + ".";
             M5ez::msgBox(TEXT_SUCCESS, msg, TEXT_OK);
+            free(tag);
             return;
         }
     }
@@ -451,6 +543,7 @@ void doRead() {
         if (! FSTools::mkdirDeep(saveFilePath.c_str())) {
             PRINTLN("Making directory failed.");
             M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+            free(tag);
             return;
         }
     }
@@ -458,11 +551,12 @@ void doRead() {
     saveFilePath = saveFilePath + "/" + hashes.saveHash + "_" + saveName + ".bin";
     PRINTV("Saving file to:", saveFilePath);
     PRINTLN("Data to save:");
-    PRINTHEX(tag.data, NTAG215_SIZE);
-    int writeResult = FSTools::writeData(saveFilePath.c_str(), tag.data, NTAG215_SIZE);
+    PRINTHEX(tag->data, NTAG215_SIZE);
+    int writeResult = FSTools::writeData(saveFilePath.c_str(), tag->data, NTAG215_SIZE);
     if (writeResult < 0) {
         PRINTV("Write failed:", writeResult);
         M5ez::msgBox(TEXT_ERROR, "We were unable to save the file.", TEXT_OK);
+        free(tag);
         return;
     }
     SaveRecord newSave = SaveRecord();
@@ -528,7 +622,8 @@ bool initialized = false;
 
 void showMainMenu() {
     if (initialized == false) {
-        ezSettings::menuObj.addItem("Select Data Set", selectDataSet);
+        ezSettings::menuObj.addItem("Select target tag type", selectTargetTagType);
+        ezSettings::menuObj.addItem("Select data set", selectDataSet);
         initialized = true;
     }
     ezMenu myMenu("AmiiBuddy");
