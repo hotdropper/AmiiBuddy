@@ -31,30 +31,18 @@ void selectTargetTagType() {
     myMenu.buttons("up#Back#select##down#");
 
     switch(TARGET_TAG_TYPE) {
-        case TARGET_MAGIC_NTAG_215:
-            myMenu.addItem("MagicNTag215|Magic NTag 21x (current)");
-            myMenu.addItem("NTag215|NTag 215");
-            myMenu.addItem("PuckJS|Puck.JS");
-            break;
         case TARGET_NTAG_215:
             myMenu.addItem("MagicNTag215|Magic NTag 21x");
             myMenu.addItem("NTag215|NTag 215 (current)");
-            myMenu.addItem("PuckJS|Puck.JS");
-            break;
-        case TARGET_PUCK_JS:
-            myMenu.addItem("MagicNTag215|Magic NTag 21x");
-            myMenu.addItem("NTag215|NTag 215");
-            myMenu.addItem("PuckJS|Puck.JS (current)");
             break;
         default:
             myMenu.addItem("MagicNTag215|Magic NTag 21x (current)");
             myMenu.addItem("NTag215|NTag 215");
-            myMenu.addItem("PuckJS|Puck.JS");
     }
 
     myMenu.runOnce();
 
-    if (myMenu.pickButton() == "Back") {
+    if (myMenu.pickButton() == BTN_BACK) {
         return;
     }
 
@@ -62,8 +50,6 @@ void selectTargetTagType() {
         TARGET_TAG_TYPE = TARGET_MAGIC_NTAG_215;
     } else if (myMenu.pickName() == "NTag215") {
         TARGET_TAG_TYPE = TARGET_NTAG_215;
-    } else if (myMenu.pickName() == "PuckJS") {
-        TARGET_TAG_TYPE = TARGET_PUCK_JS;
     }
 
     Preferences prefs;
@@ -95,7 +81,7 @@ void selectFile(const char* filename) {
     FSTools::readData(filename, tag->data, NTAG215_SIZE);
     HashInfo hashes;
     AmiiboDBAO::calculateHashes(tag->data, hashes);
-    AmiiboDBAO::findAmiiboByHash(hashes.amiiboHash, menuAmiiboBuff);
+    AmiiboDBAO::getAmiiboByHash(hashes.amiiboHash, menuAmiiboBuff);
 
     ezMenu myMenu("Select save?");
     myMenu.buttons("up#Back#select##down#Home");
@@ -129,7 +115,7 @@ void selectFile(const char* filename) {
             return;
         }
 
-        if (myMenu.pickButton() == "Back") {
+        if (myMenu.pickButton() == BTN_BACK) {
             return;
         }
 
@@ -208,7 +194,7 @@ void showBrowse(const char *path) {
 
     int counter = -15;
 
-    FSTools::traverseEntries(path, false, [&counter, &pb, &filename, &myMenu, &path](File* entry) {
+    FSTools::traverseEntries(path, false, [&counter, &pb, &filename, &myMenu, &path](File* directory, File* entry) {
         counter++;
         if (counter > 25) {
             counter = 0;
@@ -251,7 +237,7 @@ void showBrowse(const char *path) {
 //    PRINTV("Selected item caption:", myMenu.pickCaption());
 //    PRINTV("Selected item button:", myMenu.pickButton());
 
-    if (myMenu.pickButton() == "Back") {
+    if (myMenu.pickButton() == BTN_BACK) {
         String strPath(path);
         const size_t last_slash_idx = strPath.lastIndexOf("/");
         String priorPath = strPath.substring(0, last_slash_idx);
@@ -305,20 +291,20 @@ void showSearch() {
     myMenu.txtSmall();
 
     printHeapUsage();
-    bool searchResult = AmiiboDBAO::findAmiibosByFileNameMatch(searchText.c_str(), [&myMenu](AmiiboRecord& amiibo) {
-        auto item = new String(amiibo.id);
-        *item = *item + "|" + amiibo.name;
-        myMenu.addItem(*item);
+    bool searchResult = AmiiboDBAO::findAmiibosByNameMatch(searchText.c_str(), [&myMenu](AmiiboRecord& amiibo) {
+        auto item = String(amiibo.id);
+        item = item + "|" + amiibo.name;
+        myMenu.addItem(item);
     });
 
-    int16_t menuResult = myMenu.runOnce();
-    PRINTV("Menu result: ", menuResult);
-    PRINTV("Selected item:", myMenu.pick());
-    PRINTV("Selected item name:", myMenu.pickName());
-    PRINTV("Selected item caption:", myMenu.pickCaption());
-    PRINTV("Selected item button:", myMenu.pickButton());
+    if (searchResult == false) {
+        M5ez::msgBox(TEXT_WARNING, "No amiibos were matched.", TEXT_OK);
+        return;
+    }
 
-    if (myMenu.pickButton() == "Back") {
+    myMenu.runOnce();
+
+    if (myMenu.pickButton() == BTN_BACK) {
         return;
     }
 
@@ -326,7 +312,7 @@ void showSearch() {
 
     AmiiboRecord amiibo;
     int id = myMenu.pickName().toInt();
-    bool lookupResult = AmiiboDBAO::findAmiiboById(id, amiibo);
+    bool lookupResult = AmiiboDBAO::getAmiiboById(id, amiibo);
 
     printHeapUsage();
 
@@ -444,7 +430,7 @@ void doRead() {
     PRINTV("Amiibo Hash: ", hashes.amiiboHash);
     PRINTV("Save Hash: ", hashes.saveHash);
     AmiiboRecord amiibo;
-    bool foundAmiibo = AmiiboDBAO::findAmiiboByHash(hashes.amiiboHash, amiibo);
+    bool foundAmiibo = AmiiboDBAO::getAmiiboByHash(hashes.amiiboHash, amiibo);
     PRINTV("Found amiibo?", foundAmiibo);
 
     ezMenu myMenu("Save Amiibo");
@@ -522,7 +508,7 @@ void doRead() {
                 return;
             }
             SaveRecord save;
-            AmiiboDBAO::findSaveById(saveId, save);
+            AmiiboDBAO::getSaveById(saveId, save);
             strcpy(save.hash, hashes.saveHash);
             AmiiboDBAO::updateSave(save);
             AmiiboDBAO::updateSaveTimestamp(saveId);
@@ -588,7 +574,7 @@ void selectDataSet() {
 
     myMenu.runOnce();
 
-    if (myMenu.pickName() == "Back") {
+    if (myMenu.pickName() == BTN_BACK) {
         return;
     }
 

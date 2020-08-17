@@ -15,7 +15,6 @@ extern bool PN532_PRESENT;
 enum TargetTagType {
     TARGET_NTAG_215,
     TARGET_MAGIC_NTAG_215,
-    TARGET_PUCK_JS,
 };
 extern TargetTagType TARGET_TAG_TYPE;
 

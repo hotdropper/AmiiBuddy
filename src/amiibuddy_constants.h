@@ -40,6 +40,7 @@ const prog_char PROGMEM ERROR_INVALID_AMIIBO[] = "Encountered invalid amiibo fil
 
 const prog_char PROGMEM MSG_WAITING_FOR_DB_RELOAD[] = "Waiting for the db to reload...";
 
+const prog_char PROGMEM BTN_BACK[] = "Back";
 const prog_char PROGMEM TEXT_WAITING[] = "Waiting";
 const prog_char PROGMEM TEXT_WARNING[] = "Warning";
 const prog_char PROGMEM TEXT_ERROR[] = "Error";

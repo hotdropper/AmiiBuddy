@@ -50,7 +50,7 @@ Flash: [=======   ]  72.9% (used 1432974 bytes from 1966080 bytes)
 
 ### Edit ESP32/main.cpp
 
-Increase usStackDepth to 16384 from 8192
+Increase usStackDepth to 10240 from 8192
 
 ### Memory management seems to be working
 

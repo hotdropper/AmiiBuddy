@@ -21,26 +21,30 @@
 #define FS_DB_PATH "/db/amiibos.sqlite"
 #endif
 
-#define AMIIBO_FIELDS "amiibos.id, amiibos.name, amiibos.amiibo_name, amiibos.owner_name, amiibos.variation, amiibos.form, amiibos.number, amiibos.\"set\", amiibos.head, amiibos.tail, amiibos.file, amiibos.hash, amiibos.last_written"
+#define AMIIBO_FIELDS "amiibos.id, amiibos.name, amiibos.amiibo_name, amiibos.owner_name, amiibos.variation, amiibos.form, amiibos.number, amiibos.\"set\", amiibos.head, amiibos.tail, amiibos.file, amiibos.hash, amiibos.last_updated, amiibos.directory_id"
 #define SAVE_FIELDS "saves.id, saves.amiibo_id, saves.hash, saves.name, saves.file, saves.last_update, saves.is_custom"
+#define DIRECTORY_FIELDS "directories.id, directories.parent_id, directories.name, directories.path"
 
 extern FS SD;
 extern const char amiibos_sql_start[] asm("_binary_db_amiibos_sql_start");
 extern const char saves_sql_start[] asm("_binary_db_saves_sql_start");
-const prog_char PROGMEM SQL_INSERT_AMIIBO[] = "INSERT INTO amiibos (name, amiibo_name, owner_name, variation, form, number, \"set\", head, tail, file, hash, last_written) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+extern const char directories_sql_start[] asm("_binary_db_directories_sql_start");
+const prog_char PROGMEM SQL_INSERT_AMIIBO[] = "INSERT INTO amiibos (name, amiibo_name, owner_name, variation, form, number, \"set\", head, tail, file, hash, last_updated, directory_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 const prog_char PROGMEM SQL_INSERT_SAVE[] = "INSERT INTO saves (amiibo_id, hash, name, file, last_update, is_custom) VALUES (?, ?, ?, ?, ?, ?)";
-const prog_char PROGMEM SQL_UPDATE_SAVE[] = "UPDATE saves SET hash = ?, name = ?, file = ?, last_update = ? WHERE id = ?";
+const prog_char PROGMEM SQL_INSERT_DIRECTORY[] = "INSERT INTO directories (parent_id, name, path) VALUES (?, ?, ?)";
+const prog_char PROGMEM SQL_SELECT_DIRECTORY_BY_PATH[] = "SELECT " DIRECTORY_FIELDS " FROM directories WHERE path = ? LIMIT 1";
+const prog_char PROGMEM SQL_SELECT_DIRECTORIES_BY_PARENT_ID[] = "SELECT " DIRECTORY_FIELDS " FROM directories WHERE parent_id = ?";
 const prog_char PROGMEM SQL_SELECT_AMIIBO_ID_BY_HASH[] = "SELECT id FROM amiibos WHERE hash = ?";
-const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_FILE_LIKE[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE file LIKE ? ORDER BY last_written DESC";
-const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_ID[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE id = ?";
+const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_NAME_LIKE[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE name LIKE ? ORDER BY last_updated DESC LIMIT ?";
+const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_ID[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE id = ? LIMIT 1";
 const prog_char PROGMEM SQL_SELECT_SAVE_BY_ID[] = "SELECT " SAVE_FIELDS " FROM saves WHERE id = ?";
-const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_HASH[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE hash = ?";
-const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_FILE_NAME[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE file = ?";
+const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_HASH[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE hash = ? LIMIT 1";
+const prog_char PROGMEM SQL_SELECT_AMIIBO_BY_FILE_NAME[] = "SELECT " AMIIBO_FIELDS " FROM amiibos WHERE file = ? LIMIT 1";
 const prog_char PROGMEM SQL_SELECT_SAVE_BY_AMIIBO_HASH[] = "SELECT " SAVE_FIELDS " FROM saves INNER JOIN amiibos a on a.id = saves.amiibo_id WHERE a.hash = ? ORDER BY saves.last_update DESC";
 const prog_char PROGMEM SQL_SELECT_SAVE_BY_AMIIBO_FILE[] = "SELECT " SAVE_FIELDS " FROM saves INNER JOIN amiibos a on a.id = saves.amiibo_id WHERE a.file = ? ORDER BY saves.last_update DESC";
 const prog_char PROGMEM SQL_UPDATE_SAVE_TIMESTAMP_BY_ID[] = "UPDATE saves SET last_update = ? WHERE id = ?";
-const prog_char PROGMEM SQL_UPDATE_AMIIBO_TIMESTAMP_BY_ID[] = "UPDATE amiibos SET last_written = ? WHERE id = ?";
-const prog_char PROGMEM SQL_SELECT_NEXT_AMIIBO_UPDATE_INCREMENT[] = "SELECT MAX(last_written) + 1 FROM amiibos";
+const prog_char PROGMEM SQL_UPDATE_AMIIBO_TIMESTAMP_BY_ID[] = "UPDATE amiibos SET last_updated = ? WHERE id = ?";
+const prog_char PROGMEM SQL_SELECT_NEXT_AMIIBO_UPDATE_INCREMENT[] = "SELECT MAX(last_updated) + 1 FROM amiibos";
 const prog_char PROGMEM SQL_SELECT_NEXT_SAVE_UPDATE_INCREMENT[] = "SELECT MAX(last_update) + 1 FROM saves";
 
 sqlite3 *dbh;
@@ -50,6 +54,9 @@ MD5Builder md5Builder = MD5Builder();
 sqlite3_stmt *res;
 sqlite3_stmt *insertAmiiboStatement = nullptr;
 sqlite3_stmt *insertSaveStatement = nullptr;
+sqlite3_stmt *insertDirectoryStatement = nullptr;
+sqlite3_stmt *selectDirectoryByPathStmt = nullptr;
+sqlite3_stmt *findDirectoryByParentIdStmt = nullptr;
 const char *tail;
 int rc = 0;
 char adbaoHashCache[33];
@@ -58,6 +65,7 @@ char *zErrMsg = 0;
 char* sqlBuff;
 SaveRecord saveRecordBuff = SaveRecord();
 AmiiboRecord amiiboRecordBuff = AmiiboRecord();
+DirectoryRecord directoryRecordBuff = DirectoryRecord();
 int i;
 int countBuff;
 unsigned long start;
@@ -111,25 +119,28 @@ bool AmiiboDBAO::initialize() {
     return true;
 }
 
-bool AmiiboDBAO::end() {
-    sqlite3_close(dbh);
-    return true;
-}
-
-void maybeFlush() {
+void maybeFlush(bool forceFlush = false) {
+    return;
     updateCount++;
 
-    if (updateCount > 250) {
+    PRINTLN("Attempting to free up some memory...");
+    if (sqlite3_db_release_memory(dbh) != SQLITE_OK) {
+        PRINTLN("Freeing memory failed?!?!");
+    }
+
+    if (updateCount > 250 || forceFlush) {
         PRINTLN("Flushing DB to disk...");
         if (sqlite3_db_cacheflush(dbh) != SQLITE_OK) {
             PRINTLN("Flush failed?!?!");
         }
-        PRINTLN("Attempting to free up some memory...");
-        if (sqlite3_db_release_memory(dbh) != SQLITE_OK) {
-            PRINTLN("Freeing memory failed?!?!");
-        }
         updateCount = 0;
     }
+}
+
+bool AmiiboDBAO::end() {
+    maybeFlush(true);
+    sqlite3_close(dbh);
+    return true;
 }
 
 bool AmiiboDBAO::insertAmiibo(AmiiboRecord& amiibo) {
@@ -152,7 +163,8 @@ bool AmiiboDBAO::insertAmiibo(AmiiboRecord& amiibo) {
     sqlite3_bind_blob(insertAmiiboStatement, 9, &amiibo.tail, 4, SQLITE_TRANSIENT);
     sqlite3_bind_text(insertAmiiboStatement, 10, amiibo.file, strlen(amiibo.file), SQLITE_TRANSIENT);
     sqlite3_bind_text(insertAmiiboStatement, 11, amiibo.hash, 32, SQLITE_TRANSIENT);
-    sqlite3_bind_int(insertAmiiboStatement, 12, amiibo.last_written);
+    sqlite3_bind_int(insertAmiiboStatement, 12, amiibo.last_updated);
+    sqlite3_bind_int(insertAmiiboStatement, 13, amiibo.directory_id);
 
 #ifdef DEBUG_SQL
     sqlBuff = sqlite3_expanded_sql(insertAmiiboStatement);
@@ -174,10 +186,10 @@ bool AmiiboDBAO::insertAmiibo(AmiiboRecord& amiibo) {
     sqlite3_clear_bindings(insertAmiiboStatement);
     sqlite3_reset(insertAmiiboStatement);
     amiibo.id = sqlite3_last_insert_rowid(dbh);
-//    sqlite3_finalize(res);
+//    sqlite3_finalize(insertAmiiboStatement);
     PRINTV("Inserted amiibo id:", amiibo.id);
 
-//    maybeFlush();
+    maybeFlush();
     return true;
 }
 
@@ -217,7 +229,44 @@ bool AmiiboDBAO::insertSave(SaveRecord& save) {
 //    sqlite3_finalize(res);
     PRINTV("Inserted save id:", save.id);
 
-//    maybeFlush();
+    maybeFlush();
+    return true;
+}
+
+bool AmiiboDBAO::insertDirectory(DirectoryRecord &directory) {
+    if (insertDirectoryStatement == nullptr) {
+        rc = sqlite3_prepare_v2(dbh, SQL_INSERT_DIRECTORY, strlen(SQL_INSERT_DIRECTORY), &insertDirectoryStatement, &tail);
+        if (rc != SQLITE_OK) {
+            Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
+            return false;
+        }
+    }
+
+    sqlite3_bind_int(insertDirectoryStatement, 1, directory.parent_id);
+    sqlite3_bind_text(insertDirectoryStatement, 2, directory.name, strlen(directory.name), SQLITE_TRANSIENT);
+    sqlite3_bind_text(insertDirectoryStatement, 3, directory.path, strlen(directory.path), SQLITE_TRANSIENT);
+
+#ifdef DEBUG_SQL
+    sqlBuff = sqlite3_expanded_sql(insertDirectoryStatement);
+    PRINTV("INSERT:", sqlBuff);
+    sqlite3_free(sqlBuff);
+#endif
+
+    PRINTV("Attempting to insert directory:", directory.path);
+    if (sqlite3_step(insertDirectoryStatement) != SQLITE_DONE) {
+        Serial.printf("ERROR executing stmt: %s\n", sqlite3_errmsg(dbh));
+        sqlite3_clear_bindings(insertDirectoryStatement);
+        sqlite3_reset(insertDirectoryStatement);
+
+        return false;
+    }
+    sqlite3_clear_bindings(insertDirectoryStatement);
+    sqlite3_reset(insertDirectoryStatement);
+    directory.id = sqlite3_last_insert_rowid(dbh);
+//    sqlite3_finalize(res);
+    PRINTV("Inserted directory id:", directory.id);
+
+    maybeFlush();
     return true;
 }
 
@@ -248,7 +297,7 @@ bool AmiiboDBAO::updateSave(SaveRecord& save) {
     sqlite3_reset(res);
     sqlite3_finalize(res);
 
-//    maybeFlush();
+    maybeFlush();
     return true;
 }
 
@@ -256,6 +305,11 @@ bool AmiiboDBAO::truncate() {
     sqlite3_close(dbh);
     SD.remove(FS_DB_PATH);
     openDb(SQLITE_DB_PATH, &dbh);
+
+    rc = db_exec(dbh, directories_sql_start);
+    if (rc != SQLITE_OK) {
+        return false;
+    }
 
     rc = db_exec(dbh, amiibos_sql_start);
     if (rc != SQLITE_OK) {
@@ -296,10 +350,10 @@ void AmiiboDBAO::calculateHashes(uint8_t* tagData, HashInfo& hashes) {
 
 void AmiiboDBAO::calculateHashes(const amiiboInfoStruct& amiiboInfo, HashInfo& hashes) {
     calculateSaveHash(amiiboInfo, hashes.saveHash);
-    calculateAmiiboInfoHash(amiiboInfo, hashes.amiiboHash);
+    calculateAmiiboHash(amiiboInfo, hashes.amiiboHash);
 }
 
-void AmiiboDBAO::calculateAmiiboInfoHash(const amiiboInfoStruct& amiiboInfo, char* hash) {
+void AmiiboDBAO::calculateAmiiboHash(const amiiboInfoStruct& amiiboInfo, char* hash) {
     amiiboHashDetailsCache.characterNumber = amiiboInfo.amiiboCharacterNumber;
     amiiboHashDetailsCache.variation = amiiboInfo.amiiboVariation;
     amiiboHashDetailsCache.form = amiiboInfo.amiiboForm;
@@ -330,7 +384,8 @@ void readAmiiboFromResult(sqlite3_stmt* stmt, AmiiboRecord& amiibo) {
     memcpy(&amiibo.tail, sqlite3_column_blob(stmt, 9), 4);
     strcpy(amiibo.file, (const char*)sqlite3_column_text(stmt, 10));
     strcpy(amiibo.hash, (const char*)sqlite3_column_text(stmt, 11));
-    amiibo.last_written = sqlite3_column_int(stmt, 12);
+    amiibo.last_updated = sqlite3_column_int(stmt, 12);
+    amiibo.directory_id = sqlite3_column_int(stmt, 13);
 }
 
 void readSaveFromResult(sqlite3_stmt* stmt, SaveRecord& save) {
@@ -344,6 +399,13 @@ void readSaveFromResult(sqlite3_stmt* stmt, SaveRecord& save) {
     save.is_custom = sqlite3_column_int(stmt, 6) == 1;
 }
 
+void readDirectoryFromResult(sqlite3_stmt* stmt, DirectoryRecord& directory) {
+    directory.id = sqlite3_column_int(stmt, 0);
+    directory.parent_id = sqlite3_column_int(stmt, 1);
+    strcpy(directory.name, (const char*)sqlite3_column_text(stmt, 2));
+    strcpy(directory.path, (const char*)sqlite3_column_text(stmt, 3));
+}
+
 bool prepareStatement(const char* sql, sqlite3_stmt** stmt, const char* stmtTail) {
     rc = sqlite3_prepare_v2(dbh, sql, strlen(sql), stmt, &stmtTail);
     if (rc != SQLITE_OK) {
@@ -354,9 +416,9 @@ bool prepareStatement(const char* sql, sqlite3_stmt** stmt, const char* stmtTail
     return true;
 }
 
-bool readAmiibosFromQuery(sqlite3_stmt* stmt, int limit, AmiiboRecord& amiibo, const std::function<void(AmiiboRecord& record)>& callback = nullptr) {
+bool readAmiibosFromQuery(sqlite3_stmt* stmt, AmiiboRecord& amiibo, const std::function<void(AmiiboRecord& record)>& callback = nullptr) {
     countBuff = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW && (limit == 0 || countBuff < limit)) {
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
         countBuff++;
         readAmiiboFromResult(stmt, amiibo);
         if (callback != nullptr) {
@@ -389,7 +451,77 @@ bool readSavesFromQuery(sqlite3_stmt* stmt, int limit, SaveRecord& save, const s
     return countBuff > 0;
 }
 
-int AmiiboDBAO::findAmiiboIdByHash(const char* hash) {
+bool readDirectoriesFromQuery(bool finalize, sqlite3_stmt* stmt, DirectoryRecord& directory, const std::function<void(DirectoryRecord& record)>& callback = nullptr) {
+    countBuff = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        countBuff++;
+        readDirectoryFromResult(stmt, directory);
+        if (callback != nullptr) {
+            callback(directory);
+        }
+    }
+
+    sqlite3_clear_bindings(stmt);
+    sqlite3_reset(stmt);
+
+    if (finalize) {
+        sqlite3_finalize(stmt);
+    }
+
+    return countBuff > 0;
+}
+
+bool AmiiboDBAO::getDirectoryByPath(const char* path, DirectoryRecord &directory) {
+//    PRINTV("Query Template:", SQL_SELECT_DIRECTORY_BY_PATH);
+    if (selectDirectoryByPathStmt == nullptr) {
+        rc = sqlite3_prepare_v2(dbh, SQL_SELECT_DIRECTORY_BY_PATH, strlen(SQL_SELECT_DIRECTORY_BY_PATH), &selectDirectoryByPathStmt, &tail);
+        if (rc != SQLITE_OK) {
+            Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
+            return false;
+        }
+    }
+
+    directory.id = 0;
+    directory.parent_id = 0;
+    strcpy(directory.name, "");
+    strcpy(directory.path, "");
+    PRINTV("Path:", path);
+
+    sqlite3_bind_text(selectDirectoryByPathStmt, 1, path, strlen(path), SQLITE_TRANSIENT);
+
+#ifdef DEBUG_SQL
+    sqlBuff = sqlite3_expanded_sql(selectDirectoryByPathStmt);
+    PRINTV("Query:", sqlBuff);
+    sqlite3_free(sqlBuff);
+#endif
+
+    return readDirectoriesFromQuery(false, selectDirectoryByPathStmt, directory);
+}
+
+bool AmiiboDBAO::findDirectoriesByParentId(const int parentId, const std::function<void(DirectoryRecord &)> &callback) {
+//    PRINTV("Query Template:", SQL_SELECT_DIRECTORY_BY_PATH);
+    if (findDirectoryByParentIdStmt == nullptr) {
+        rc = sqlite3_prepare_v2(dbh, SQL_SELECT_DIRECTORIES_BY_PARENT_ID, strlen(SQL_SELECT_DIRECTORIES_BY_PARENT_ID), &findDirectoryByParentIdStmt, &tail);
+        if (rc != SQLITE_OK) {
+            Serial.printf("ERROR preparing sql: %s\n", sqlite3_errmsg(dbh));
+            return false;
+        }
+    }
+
+    PRINTV("Parent Id:", parentId);
+
+    sqlite3_bind_int(selectDirectoryByPathStmt, 1, parentId);
+
+#ifdef DEBUG_SQL
+    sqlBuff = sqlite3_expanded_sql(selectDirectoryByPathStmt);
+    PRINTV("Query:", sqlBuff);
+    sqlite3_free(sqlBuff);
+#endif
+
+    return readDirectoriesFromQuery(false, selectDirectoryByPathStmt, directoryRecordBuff);
+}
+
+int AmiiboDBAO::getAmiiboIdByHash(const char* hash) {
     if (! prepareStatement(SQL_SELECT_AMIIBO_ID_BY_HASH, &res, tail)) {
         return -1;
     }
@@ -419,7 +551,7 @@ int AmiiboDBAO::findAmiiboIdByHash(const char* hash) {
     return rc;
 }
 
-bool AmiiboDBAO::findAmiiboById(const int id, AmiiboRecord& amiibo) {
+bool AmiiboDBAO::getAmiiboById(int id, AmiiboRecord& amiibo) {
     if (! prepareStatement(SQL_SELECT_AMIIBO_BY_ID, &res, tail)) {
         return false;
     }
@@ -432,10 +564,10 @@ bool AmiiboDBAO::findAmiiboById(const int id, AmiiboRecord& amiibo) {
     sqlite3_free(sqlBuff);
 #endif
 
-    return readAmiibosFromQuery(res, 1, amiibo);
+    return readAmiibosFromQuery(res, amiibo);
 }
 
-bool AmiiboDBAO::findSaveById(const int id, SaveRecord& save) {
+bool AmiiboDBAO::getSaveById(int id, SaveRecord& save) {
     if (! prepareStatement(SQL_SELECT_SAVE_BY_ID, &res, tail)) {
         return false;
     }
@@ -451,7 +583,7 @@ bool AmiiboDBAO::findSaveById(const int id, SaveRecord& save) {
     return readSavesFromQuery(res, 1, save);
 }
 
-bool AmiiboDBAO::findAmiiboByHash(const char* hash, AmiiboRecord& amiibo) {
+bool AmiiboDBAO::getAmiiboByHash(const char* hash, AmiiboRecord& amiibo) {
     PRINTV("Query Template:", SQL_SELECT_AMIIBO_BY_HASH);
     if (! prepareStatement(SQL_SELECT_AMIIBO_BY_HASH, &res, tail)) {
         return false;
@@ -467,10 +599,10 @@ bool AmiiboDBAO::findAmiiboByHash(const char* hash, AmiiboRecord& amiibo) {
     sqlite3_free(sqlBuff);
 #endif
 
-    return readAmiibosFromQuery(res, 1, amiibo);
+    return readAmiibosFromQuery(res, amiibo);
 }
 
-bool AmiiboDBAO::findAmiiboByFileName(const char *filename, AmiiboRecord &amiibo) {
+bool AmiiboDBAO::getAmiiboByFileName(const char *filename, AmiiboRecord &amiibo) {
     if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_NAME, &res, tail)) {
         return false;
     }
@@ -483,17 +615,18 @@ bool AmiiboDBAO::findAmiiboByFileName(const char *filename, AmiiboRecord &amiibo
     sqlite3_free(sqlBuff);
 #endif
 
-    return readAmiibosFromQuery(res, 1, amiibo);
+    return readAmiibosFromQuery(res, amiibo);
 }
 
-bool AmiiboDBAO::findAmiibosByFileNameMatch(const char* filename, const std::function<void(AmiiboRecord& record)>& callback, int limit) {
-    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_FILE_LIKE, &res, tail)) {
+bool AmiiboDBAO::findAmiibosByNameMatch(const char* name, const std::function<void(AmiiboRecord& record)>& callback, int limit) {
+    if (! prepareStatement(SQL_SELECT_AMIIBO_BY_NAME_LIKE, &res, tail)) {
         return false;
     }
 
     String partial("%");
-    partial = partial + filename + "%";
+    partial = partial + name + "%";
     sqlite3_bind_text(res, 1, partial.c_str(), partial.length(), SQLITE_TRANSIENT);
+    sqlite3_bind_int(res, 2, limit);
 
 #ifdef DEBUG_SQL
     sqlBuff = sqlite3_expanded_sql(res);
@@ -501,7 +634,7 @@ bool AmiiboDBAO::findAmiibosByFileNameMatch(const char* filename, const std::fun
     sqlite3_free(sqlBuff);
 #endif
 
-    return readAmiibosFromQuery(res, limit, amiiboRecordBuff, callback);
+    return readAmiibosFromQuery(res, amiiboRecordBuff, callback);
 }
 
 bool AmiiboDBAO::findSavesByAmiiboHash(const char* hash, const std::function<void(SaveRecord& record)>& callback, int limit) {
@@ -543,7 +676,7 @@ bool executeStatement(sqlite3_stmt* stmt) {
     sqlite3_reset(stmt);
     sqlite3_finalize(stmt);
 
-//    maybeFlush();
+    maybeFlush();
     return true;
 }
 
@@ -611,6 +744,6 @@ bool AmiiboDBAO::updateSaveTimestamp(const int id, int timestamp) {
         return false;
     }
 
-    AmiiboDBAO::findSaveById(id, saveRecordBuff);
+    AmiiboDBAO::getSaveById(id, saveRecordBuff);
     return AmiiboDBAO::updateAmiiboTimestamp(saveRecordBuff.amiibo_id);
 }

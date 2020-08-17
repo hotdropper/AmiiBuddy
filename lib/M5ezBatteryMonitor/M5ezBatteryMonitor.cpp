@@ -19,10 +19,9 @@ void M5ezBatteryMonitor::begin(int mode) {
 void M5ezBatteryMonitor::restart() {
     ezHeader::remove("battery");
     _chargeFlip = false;
-    uint8_t length = 5;
 
     M5ez::setFont(M5ez::theme->clock_font);
-    uint8_t width = length * m5.lcd.textWidth("5") + M5ez::theme->header_hmargin * 2;
+    uint8_t width = m5.lcd.textWidth("+100%") + M5ez::theme->header_hmargin;
 
     ezHeader::insert(RIGHTMOST, "battery", width, M5ezBatteryMonitor::draw);
 }

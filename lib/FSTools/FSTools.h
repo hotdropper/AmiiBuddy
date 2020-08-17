@@ -23,29 +23,31 @@ struct DirectoryDetails {
     int dir_count;
 };
 
+typedef std::function <void (File* directory, File* entry)> fs_entry_callback_t;
+
 class FSTools {
 public:
     static void init();
     static FS* getFSByPath(const char* path, char* outPath);
-    static void traverseEntries(FS* fs, std::list<String>& dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const std::function <void (File*)>& callback);
-    static void traverseEntries(const char* dir, const bool recursive, const std::function <void (File*)>& callback, FS* fs);
-    static void traverseEntries(const char* dir, const bool recursive, const std::function <void (File*)>& callback) {
+    static void traverseEntries(FS* fs, std::list<String>& dirs, const bool recursive, const bool callOnFile, const bool callOnDir, const fs_entry_callback_t& callback);
+    static void traverseEntries(const char* dir, const bool recursive, const fs_entry_callback_t& callback, FS* fs);
+    static void traverseEntries(const char* dir, const bool recursive, const fs_entry_callback_t& callback) {
         if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
             return;
         }
 
         return traverseEntries(pathBuffer, recursive, callback, fsBuffer);
     }
-    static void traverseFiles(const char* dir, const std::function <void (File*)>& callback, FS* fs);
-    static void traverseFiles(const char* dir, const std::function <void (File*)>& callback) {
+    static void traverseFiles(const char* dir, const fs_entry_callback_t& callback, FS* fs);
+    static void traverseFiles(const char* dir, const fs_entry_callback_t& callback) {
         if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
             return;
         }
 
         return traverseFiles(pathBuffer, callback, fsBuffer);
     }
-    static void traverseDirs(const char* dir, const std::function <void (File*)>& callback, FS* fs);
-    static void traverseDirs(const char* dir, const std::function <void (File*)>& callback) {
+    static void traverseDirs(const char* dir, const fs_entry_callback_t& callback, FS* fs);
+    static void traverseDirs(const char* dir, const fs_entry_callback_t& callback) {
         if (! (fsBuffer = getFSByPath(dir, pathBuffer))) {
             return;
         }
@@ -150,8 +152,8 @@ public:
         return writeData(pathBuffer, data, dataLength, fsBuffer);
     }
 
-    static int readDirectoryDetails(const char* path, DirectoryDetails& details, FS* fs, const std::function <void (File*)>& callback = nullptr);
-    static int readDirectoryDetails(const char* path, DirectoryDetails& details, const std::function <void (File*)>& callback = nullptr) {
+    static int readDirectoryDetails(const char* path, DirectoryDetails& details, FS* fs, const fs_entry_callback_t& callback = nullptr);
+    static int readDirectoryDetails(const char* path, DirectoryDetails& details, const fs_entry_callback_t& callback = nullptr) {
         if (! (fsBuffer = getFSByPath(path, pathBuffer))) {
             return -100;
         }

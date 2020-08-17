@@ -6,13 +6,9 @@
 #include <ArduinoDebug.h>
 #include <Arduino.h>
 #include "AmiiboDatabaseManager.h"
-#include <string>
-#include <list>
 #include <M5ez.h>
-#include <MD5Builder.h>
 #include <FSTools.h>
 #include "../utils.h"
-#include <sqlite3.h>
 #include <AmiiboDBAO.h>
 #include "amiibuddy_constants.h"
 
@@ -26,7 +22,7 @@
 ezProgressBar* pb;
 
 tag_data_t amiiboData;
-DirectoryDetails adbDirDets = {0, 0};
+DirectoryDetails adbDirDetails = {0, 0};
 int adbFileCount = 0;
 int adbItemCounter = 0;
 md5_hash_t adbHashCache = "";
@@ -34,13 +30,15 @@ File dirBuff;
 int lenBuff;
 AmiiboRecord mgrAmiiboBuff;
 SaveRecord mgrSaveBuff;
+DirectoryRecord mgrParentDirectoryBuff;
+DirectoryRecord mgrDirectoryBuff;
 const char* pathBuff;
 String fileNameStrBuff;
 String nameStrBuff;
 String msgBuff;
 
 void fileToAmiiboName(const char* filePath, char* name, size_t nameLen, bool powerSave) {
-    fileNameStrBuff = String(filePath);
+    fileNameStrBuff = filePath;
     nameStrBuff = fileNameStrBuff.substring(fileNameStrBuff.lastIndexOf("/") + 1);
     nameStrBuff = nameStrBuff.substring(0, nameStrBuff.lastIndexOf("."));
     int dashPos = nameStrBuff.indexOf("-");
@@ -55,9 +53,6 @@ void fileToAmiiboName(const char* filePath, char* name, size_t nameLen, bool pow
     } else {
         nameStrBuff = nameStrBuff.substring(0, nameStrBuff.indexOf("["));
         nameStrBuff.trim();
-        fileNameStrBuff = fileNameStrBuff.substring(0, fileNameStrBuff.lastIndexOf("/"));
-        fileNameStrBuff = fileNameStrBuff.substring(fileNameStrBuff.lastIndexOf("/") + 1);
-        nameStrBuff = nameStrBuff + " (" + fileNameStrBuff + ")";
     }
 
     strlcpy(name, nameStrBuff.c_str(), nameLen);
@@ -104,14 +99,14 @@ bool loadAndProcessAmiiboFile(const char* path, AmiiboRecord& amiibo) {
     amiibo.set = atool.amiiboInfo.amiiboSet;
     memcpy(amiibo.head, atool.amiiboInfo.amiiboHead, 4);
     memcpy(amiibo.tail, atool.amiiboInfo.amiiboTail, 4);
-    AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, amiibo.hash);
+    AmiiboDBAO::calculateAmiiboHash(atool.amiiboInfo, amiibo.hash);
     strcpy(amiibo.file, path);
-    amiibo.last_written = 0;
+    amiibo.last_updated = 0;
 
     return true;
 }
 
-void readDirectoryDetails(const char* header, const char* msg, const char* path, DirectoryDetails* dirDetails) {
+void readDirectoryDetails(const char* header, const char* msg, const char* path, DirectoryDetails& dirDetails) {
     adbItemCounter = 0;
 
     if (pb != nullptr) {
@@ -120,7 +115,7 @@ void readDirectoryDetails(const char* header, const char* msg, const char* path,
 
     pb = new ezProgressBar(header, msg);
 
-    FSTools::readDirectoryDetails(path, adbDirDets, [](File* file) {
+    FSTools::readDirectoryDetails(path, dirDetails, [](File* directory, File* file) {
         adbItemCounter++;
 
         if (adbItemCounter % 5 != 0) {
@@ -138,8 +133,8 @@ void readDirectoryDetails(const char* header, const char* msg, const char* path,
 }
 
 void rebuildFileData(const char* library_path) {
-    readDirectoryDetails("Scanning", "Scanning your Amiibo library...", library_path, &adbDirDets);
-    adbFileCount = adbDirDets.file_count;
+    readDirectoryDetails("Scanning", "Scanning your Amiibo library...", library_path, adbDirDetails);
+    adbFileCount = adbDirDetails.file_count;
 
     if (pb != nullptr) {
         free(pb);
@@ -172,7 +167,7 @@ void rebuildFileData(const char* library_path) {
     PRINTLN("____ START ____");
     printHeapUsage();
 
-    FSTools::traverseFiles(library_path, [&incrementProgressValue](File *entry) -> void {
+    FSTools::traverseFiles(library_path, [&incrementProgressValue](File* directory, File *entry) -> void {
         PRINTV("Processing file: ", entry->name());
         pathBuff = entry->name();
         lenBuff = strlen(pathBuff);
@@ -186,9 +181,9 @@ void rebuildFileData(const char* library_path) {
 
 //        printHeapUsage();
         loadAndProcessAmiiboFile(pathBuff, mgrAmiiboBuff);
-        if (AmiiboDBAO::insertAmiibo(mgrAmiiboBuff)) {
-            mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
-        } else if (AmiiboDBAO::findAmiiboByHash(mgrAmiiboBuff.hash, mgrAmiiboBuff)) {
+        AmiiboDBAO::getDirectoryByPath(directory->name(), mgrDirectoryBuff);
+        mgrAmiiboBuff.directory_id = mgrDirectoryBuff.id;
+        if (AmiiboDBAO::insertAmiibo(mgrAmiiboBuff) || AmiiboDBAO::getAmiiboByHash(mgrAmiiboBuff.hash, mgrAmiiboBuff)) {
             mgrSaveBuff.amiibo_id = mgrAmiiboBuff.id;
         } else {
             M5ez::msgBox(TEXT_ERROR, String("Could not load ") + pathBuff, TEXT_OK);
@@ -217,8 +212,8 @@ void rebuildFileData(const char* library_path) {
 
 
 void rebuildPowerSaveData(const char* power_save_path) {
-    readDirectoryDetails("Scanning", "Scanning your Power Save library...", power_save_path, &adbDirDets);
-    adbFileCount = adbDirDets.file_count;
+    readDirectoryDetails("Scanning", "Scanning your Power Save library...", power_save_path, adbDirDetails);
+    adbFileCount = adbDirDetails.file_count;
 
     if (pb != nullptr) {
         free(pb);
@@ -250,16 +245,16 @@ void rebuildPowerSaveData(const char* power_save_path) {
     PRINTLN("____ START ____");
     printHeapUsage();
 
-    FSTools::traverseFiles(power_save_path, [&incrementProgressValue](File *entry) -> void {
+    FSTools::traverseFiles(power_save_path, [&incrementProgressValue](File* directory, File *entry) -> void {
         if (! loadAmiiboFile(entry->name())) {
             return;
         }
 
         M5ez::yield();
 
-        AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, adbHashCache);
+        AmiiboDBAO::calculateAmiiboHash(atool.amiiboInfo, adbHashCache);
 
-        mgrSaveBuff.amiibo_id = AmiiboDBAO::findAmiiboIdByHash(adbHashCache);
+        mgrSaveBuff.amiibo_id = AmiiboDBAO::getAmiiboIdByHash(adbHashCache);
         AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
         fileToAmiiboName(entry->name(), mgrSaveBuff.name, sizeof(SaveRecord::name), true);
         strlcpy(mgrSaveBuff.file, entry->name(), sizeof(SaveRecord::file));
@@ -278,8 +273,8 @@ void rebuildPowerSaveData(const char* power_save_path) {
 }
 
 void rebuildCustomSaveData(const char* custom_save_path) {
-    readDirectoryDetails("Scanning", "Scanning your Custom Save library...", custom_save_path, &adbDirDets);
-    adbFileCount = adbDirDets.file_count;
+    readDirectoryDetails("Scanning", "Scanning your Custom Save library...", custom_save_path, adbDirDetails);
+    adbFileCount = adbDirDetails.file_count;
 
     if (pb != nullptr) {
         free(pb);
@@ -311,16 +306,16 @@ void rebuildCustomSaveData(const char* custom_save_path) {
     PRINTLN("____ START ____");
     printHeapUsage();
 
-    FSTools::traverseFiles(custom_save_path, [&incrementProgressValue](File *entry) -> void {
+    FSTools::traverseFiles(custom_save_path, [&incrementProgressValue](File* directory, File *entry) -> void {
         if (! loadAmiiboFile(entry->name())) {
             return;
         }
 
         M5ez::yield();
 
-        AmiiboDBAO::calculateAmiiboInfoHash(atool.amiiboInfo, adbHashCache);
+        AmiiboDBAO::calculateAmiiboHash(atool.amiiboInfo, adbHashCache);
 
-        mgrSaveBuff.amiibo_id = AmiiboDBAO::findAmiiboIdByHash(adbHashCache);
+        mgrSaveBuff.amiibo_id = AmiiboDBAO::getAmiiboIdByHash(adbHashCache);
         AmiiboDBAO::calculateSaveHash(atool.amiiboInfo, mgrSaveBuff.hash);
         String saveName = String(entry->name());
         PRINTV("Save name:", saveName);
@@ -356,10 +351,52 @@ void rebuildCustomSaveData(const char* custom_save_path) {
     printHeapUsage();
 }
 
+void rebuildLibraryDirectoryData(const char* library_path) {
+    if (pb != nullptr) {
+        free(pb);
+    }
+
+    pb = new ezProgressBar("Scanning", "Scanning your directory structure...");
+    adbItemCounter = 0;
+    int libraryPathLen = strlen(library_path);
+    FSTools::traverseDirs(library_path, [libraryPathLen](File* directory, File* file) {
+        if (strlen(directory->name()) < libraryPathLen) {
+            mgrParentDirectoryBuff.id = 0;
+        } else {
+            AmiiboDBAO::getDirectoryByPath(directory->name(), mgrParentDirectoryBuff);
+        }
+
+        mgrDirectoryBuff.id = 0;
+        mgrDirectoryBuff.parent_id = mgrParentDirectoryBuff.id;
+        fileNameStrBuff = file->name();
+        fileNameStrBuff = fileNameStrBuff.substring(fileNameStrBuff.lastIndexOf("/") + 1);
+        strcpy(mgrDirectoryBuff.name, fileNameStrBuff.c_str());
+        strcpy(mgrDirectoryBuff.path, file->name());
+
+        AmiiboDBAO::insertDirectory(mgrDirectoryBuff);
+
+        adbItemCounter++;
+
+        if (adbItemCounter % 5 != 0) {
+            return;
+        }
+
+        if (adbItemCounter > 100) {
+            adbItemCounter = 0;
+        }
+
+        pb->value(((float) adbItemCounter / (float)100) * 100);
+        M5ez::redraw();
+        M5ez::yield();
+    });
+}
+
 bool AmiiboDatabaseManager::reinitialize(const char* library_path, const char* power_saves_path, const char* custom_saves_path) {
     if (! AmiiboDBAO::truncate()) {
         return false;
     }
+
+    rebuildLibraryDirectoryData(library_path);
 
     rebuildFileData(library_path);
 
