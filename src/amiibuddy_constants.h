@@ -61,4 +61,10 @@ typedef uint8_t tag_data_t[540];
 typedef uint8_t tag_key_data[160];
 typedef char md5_hash_t[40];
 
+enum TargetTagType {
+    NO_TAG_PRESENT,
+    TARGET_NTAG_215,
+    TARGET_MAGIC_NTAG_215,
+};
+
 #endif //AMIIBUDDY_AMIIBUDDY_CONSTANTS_H

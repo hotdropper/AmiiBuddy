@@ -877,8 +877,19 @@ bool PN532::inDataExchange(uint8_t *send, uint8_t sendLength, uint8_t *response,
         return false;
     }
 
+    DMSG("Response length: ");
+    DMSG(status);
+    DMSG("\n");
+
     if ((response[0] & 0x3f) != 0) {
         DMSG("Status code indicates an error\n");
+        DMSG("Response Length:");
+        DMSG(*responseLength);
+        DMSG("\n");
+        DMSG("Response:\n");
+        PRINTHEX(response, *responseLength);
+        DMSG("\n");
+
         return false;
     }
 

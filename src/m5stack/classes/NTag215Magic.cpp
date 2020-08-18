@@ -171,9 +171,12 @@ uint8_t cmdBuffer[50];
 
 bool NTag215Magic::wipe() {
     for (int b = 3; b <= 0xFB; b++) {
-        if (b == 0x29 || b == 0x83 || b == 0xe3) {
+        if (b > 0x86 && b < 0xF0) {
+            continue;
+        }
+        if (b == 0x83) {
             strcpy(tmpl, CONFIG_1_TEMPLATE);
-        } else if (b == 0x2a || b == 0x84 || b == 0xe4) {
+        } else if (b == 0x84) {
             strcpy(tmpl, CONFIG_2_TEMPLATE);
         } else {
             strcpy(tmpl, CONFIG_EMPTY_TEMPLATE);

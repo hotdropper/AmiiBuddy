@@ -16,6 +16,7 @@
 #include "classes/AmiiboDatabaseManager.h"
 #include "../../lib/M5ezBatteryMonitor/M5ezBatteryMonitor.h"
 #include "classes/NFCMonitor.h"
+#include "classes/NTag215Reader.h"
 
 PN532_I2C pn532i2c(Wire);
 TrackablePN532Interface trackablePN532(pn532i2c);
@@ -76,6 +77,8 @@ void showInit() {
     } else {
         ezSettings::menuObj.addItem("Re-initialize database", initializeDatabase);
     }
+
+    NTag215Reader::init(&pn532);
 
     nfcMonitor.begin(&pn532, &SD, &M5.Lcd);
     M5ezBatteryMonitor::begin();
